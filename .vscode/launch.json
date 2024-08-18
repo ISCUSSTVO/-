@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Отладчик Python: qwe.py",
+            "name": "Отладчик Python: app.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "qwe.py",
+            "program": "app.py",
             "console": "integratedTerminal"
         }
     ]

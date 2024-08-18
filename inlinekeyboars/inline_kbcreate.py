@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-def inline_kbcreate(
+def inkbcreate(
     *,
     btns: dict[str, str],
     sizes: tuple[int] = (2,)):
