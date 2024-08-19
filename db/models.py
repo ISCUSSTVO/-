@@ -14,10 +14,12 @@ class admlist(Base):
 class accounts(Base):
     __tablename__ = 'allacc'
 
+    name: Mapped[str] = mapped_column(primary_key=True)
     description: Mapped[str] = mapped_column(String)
-    gamesonaacaunt: Mapped[str] = mapped_column(primary_key = True)
+    gamesonaacaunt: Mapped[str] = mapped_column(String)
     categories: Mapped[str] = mapped_column(String)
-    price: Mapped[int]  = mapped_column(Float)
+    price: Mapped[int]  = mapped_column(Float(500))
+    image: Mapped[str] = mapped_column(String)
     acclog: Mapped[str] = mapped_column(String)
     accpass: Mapped[str] = mapped_column(String)
 
