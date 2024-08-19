@@ -17,8 +17,10 @@ class addadminglobal(StatesGroup):
 
 
 class addaccount(StatesGroup):
+    desc = State()
     game = State()
     categories = State()
+    priceacc = State()
     acclogin = State()
     accpasword = State()
 
@@ -110,24 +112,39 @@ async def addadm(callback: types.CallbackQuery, session: AsyncSession):
             'пшёл нахуй пёс'
         )
 
-
 @adm_router.callback_query(F.data == ('Plus_acc'))
 async def addadmin1(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(
-        text='Введи игры, которые есть на аккаунте'
+        text='Введи описание аккаунта'
+    )
+    await state.set_state(addaccount.desc)
+
+@adm_router.message(addaccount.desc)
+async def addgame_desc(message: types.Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(accdesc=message.text)
+    await message.reply(
+        'Введи игры на аккаунте'
     )
     await state.set_state(addaccount.game)
 
 @adm_router.message(addaccount.game)
-async def addgame(message: types.Message, session: AsyncSession, state: FSMContext):
+async def addgame_game(message: types.Message, session: AsyncSession, state: FSMContext):
     await state.update_data(accgame=message.text)
     await message.reply(
-        'Теперь логин или почту от аккаунта'
+        'Введи цену аккаунта'
+    )
+    await state.set_state(addaccount.priceacc)
+
+@adm_router.message(addaccount.priceacc)
+async def addprice(message: types.Message, state: FSMContext):
+    await state.update_data(priceacc=message.text)
+    await message.reply(
+        'Теперь введи категории игр на аккаунте'
     )
     await state.set_state(addaccount.categories)
 
 @adm_router.message(addaccount.categories)
-async def addgame(message: types.Message, session: AsyncSession, state: FSMContext):
+async def addcategories(message: types.Message, state: FSMContext):
     await state.update_data(acccat=message.text)
     await message.reply(
         'Теперь логин или почту от аккаунта'
@@ -135,37 +152,43 @@ async def addgame(message: types.Message, session: AsyncSession, state: FSMConte
     await state.set_state(addaccount.acclogin)
 
 @adm_router.message(addaccount.acclogin)
-async def addlogin(message: types.Message, session: AsyncSession, state: FSMContext):
+async def addlogin(message: types.Message, state: FSMContext):
     await state.update_data(accnewlogin=message.text)
     await message.reply(
-        'теперь пароль'
+        'Теперь пароль'
     )
     await state.set_state(addaccount.accpasword)
 
 @adm_router.message(addaccount.accpasword)
 async def addpassword(message: types.Message, session: AsyncSession, state: FSMContext):
     await state.update_data(accnewpassword=message.text)
+    
+    # Получаем данные состояния
     data = await state.get_data()
+    
+    # Создаем новый объект аккаунта
     newaccgame = accounts(
+        description=data['accdesc'],
         gamesonaacaunt=data['accgame'],
+        price=data['priceacc'],
         categories=data['acccat'],
         acclog=data['accnewlogin'],
         accpass=data['accnewpassword'],
     )
 
+    # Добавляем и коммитим в сессии базы данных
+    newacc = await session.execute(select(accounts))
+    newacc = newacc.scalars().all()
     session.add(newaccgame)
     await session.commit()
 
     await message.reply(
         'Аккаунт добавлен'
     )
-    
-    newacc = await session.execute(select(accounts))
-    newacc = newacc.scalars().all()
-    await state.clear()
+
     
     await message.answer(
-        f'Текущий список аккаунтов: {", ".join(acc.gamesonaacaunt for acc in newacc)}'
+        f'Текущий список аккаунтов: {", ".join(acc.description for acc in newacc)}'
     )
 
 

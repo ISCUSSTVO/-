@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, DateTime, func
+from sqlalchemy import String, DateTime, func, Float
 
 class Base(DeclarativeBase):
     created: Mapped[DateTime] = mapped_column(DateTime, default =func.now())
@@ -14,8 +14,10 @@ class admlist(Base):
 class accounts(Base):
     __tablename__ = 'allacc'
 
+    description: Mapped[str] = mapped_column(String)
     gamesonaacaunt: Mapped[str] = mapped_column(primary_key = True)
-    categories: Mapped[str] = mapped_column(String(150))
+    categories: Mapped[str] = mapped_column(String)
+    price: Mapped[int]  = mapped_column(Float)
     acclog: Mapped[str] = mapped_column(String)
     accpass: Mapped[str] = mapped_column(String)
 
