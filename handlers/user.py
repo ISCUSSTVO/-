@@ -1,19 +1,17 @@
-import logging
+from sqlite3 import IntegrityError
 from aiogram import types, Router
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart
 from aiogram import F
-from sqlalchemy import select
-from inlinekeyboars.inline_kbcreate import inkbcreate
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.models import accounts
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
-
-
+from inlinekeyboars.inline_kbcreate import inkbcreate
+from db.models import Accounts, Backet
 
 user_router = Router()
 
-logger = logging.getLogger(__name__)
 
+account_list = [] 
 
 
 @user_router.message(F.text.lower().contains('старт'))
@@ -30,6 +28,7 @@ async def comm_start(message: types.Message):
 async def comm_cat(callback: types.CallbackQuery):
     await callback.message.answer(
         'Выбирай что ты хочешь', reply_markup=inkbcreate(btns={
+            'Ваша корзина': 'checkbacket',
             'Категории игр': 'categ',
             'Все доступные аккаунты': 'allacc',
             'Поиск аккаунта с игрой': 'searchgame',
@@ -37,62 +36,11 @@ async def comm_cat(callback: types.CallbackQuery):
         })
     )
 
-@user_router.callback_query(F.data == 'categ')
-async def categor(cb: types.CallbackQuery, session: AsyncSession):
-    try:
-        result = await session.execute(select(accounts))
-        account_list = result.scalars().all()
-        
-        if account_list:
-            categories = {}
-            # Группируем аккаунты по категориям
-            for account in account_list:
-                if account.categories not in categories:
-                    categories[account.categories] = []
-                categories[account.categories].append(account)
-
-            # Отправляем категории и создаем инлайн-кнопки
-            for category, accounts in categories.items():
-                await cb.message.answer(f"Категория: {category}", reply_markup=inkbcreate(btns={
-                    f"Показать аккаунты в категории: {category}": f'show_accounts:{category}'
-                }))
-        else:
-            await cb.message.answer(
-                'Нет категорий, братик', reply_markup=inkbcreate(btns={
-                    'В меню': 'menu'
-                })
-            )
-    except Exception as e:
-        logger.error(f"Ошибка при получении категорий: {e}")
-        await cb.message.answer("Произошла ошибка при получении категорий.")
-
-@user_router.callback_query(F.data.startswith('show_accounts:'))
-async def show_accounts(cb: types.CallbackQuery, session: AsyncSession):
-    category = cb.data.split(':')[1]  # Получаем категорию из callback_data
-    try:
-        result = await session.execute(select(accounts).where(accounts.categories == category))
-        account_list = result.scalars().all()
-        
-        if account_list:
-            for account in account_list:
-                await cb.message.answer(
-                    f"Аккаунт: {account.acclog}, Пароль: {account.accpass}, Игры: {account.gamesonaacaunt}, Цена: {account.price}"
-                )
-        else:
-            await cb.message.answer(
-                f'Нет аккаунтов в категории: {category}'
-            )
-    except Exception as e:
-        logger.error(f"Ошибка при получении аккаунтов для категории {category}: {e}")
-        await cb.message.answer("Произошла ошибка при получении аккаунтов.")
-
-            
 
 
 @user_router.message(F.text.lower().contains('аккаунты'))
 @user_router.callback_query(F.data == "allacc")
 async def view_all_accounts(message_or_query: types.Message | types.CallbackQuery, session: AsyncSession):
-    global account
     if isinstance(message_or_query, types.CallbackQuery):
         await message_or_query.answer()
         message = message_or_query.message
@@ -100,23 +48,28 @@ async def view_all_accounts(message_or_query: types.Message | types.CallbackQuer
         message = message_or_query
 
     # Получаем все аккаунты из таблицы accounts
-    result = await session.execute(select(accounts))
+    result = await session.execute(select(Accounts))
     account_list = result.scalars().all()
 
     if account_list:
         for account in account_list:
             desc_name = account.name if account.name else "Без названия"
-            account_info = ({account.image},
-                            f"Аккаунт: {desc_name}\n"
-                            f"Игры: {account.gamesonaacaunt}\n"
-                            f"Цена: {account.price}")
+            description = account.description if account.description else "Нет описания"
+            account_info = (
+                f"Аккаунт: {desc_name}\n"
+                f"Игры: {account.gamesonaacaunt}\n"
+                f"Цена: {account.price}"
+            )
 
             # Создаем инлайн-кнопку для каждого аккаунта
-            inline_button = InlineKeyboardButton(text=f"Подробнее о {desc_name}", callback_data=f"details_{desc_name}")
+            inline_button = InlineKeyboardButton(text=f"Подробнее о {desc_name}", callback_data=f"details_{desc_name}_{description}")
             keyboard = InlineKeyboardMarkup(inline_keyboard=[[inline_button]])
 
-            # Отправляем информацию об аккаунте в отдельном сообщении
-            await message.answer(account_info, reply_markup=keyboard)
+            # Отправляем информацию об аккаунте с кнопкой "Подробнее" и изображением
+            if account.image:  # Проверяем, есть ли изображение
+                await message.answer_photo(photo=account.image, caption=account_info, reply_markup=keyboard)
+            else:
+                await message.answer(account_info, reply_markup=keyboard)
     else:
         await message.answer(
             'Нет аккаунтов братик', reply_markup=inkbcreate(btns={
@@ -124,15 +77,133 @@ async def view_all_accounts(message_or_query: types.Message | types.CallbackQuer
             })
         )
 
-@user_router.callback_query(F.data.startswith("details_"))
-async def account_details(callback: types.CallbackQuery):
-    account_name = callback.data.split("_", 1)[1]  # Получаем имя аккаунта
+@user_router.callback_query(F.data == 'categ')
+async def categor(cb: types.CallbackQuery, session: AsyncSession):
+    result = await session.execute(select(Accounts))
+    account_list = result.scalars().all()
+        
+    if account_list:
+        categories = {}
+        # Группируем аккаунты по категориям
+        for account in account_list:
+            if account.categories not in categories:
+                categories[account.categories] = []
+            categories[account.categories].append(account)
 
-    # Здесь можно добавить логику для получения более подробной информации
-    await callback.message.answer(f"Вы выбрали аккаунт: {account_name}.\n{account.description}")
+        # Отправляем категории и создаем инлайн-кнопки
+        for category_name in categories.keys():
+            await cb.message.answer(
+                f"Категория: {category_name}",
+                reply_markup=inkbcreate(btns={
+                    "Показать аккаунты": f'show_accounts:{category_name}'
+                })
+            )
+    else:
+        await cb.message.answer(
+            'Нет категорий, братик', 
+            reply_markup=inkbcreate(btns={
+                'В меню': 'menu'
+            })
+        )
+
+@user_router.callback_query(F.data.startswith('show_accounts:'))
+async def show_accounts(cb: types.CallbackQuery, session: AsyncSession):
+    category = cb.data.split(':')[1]  # Получаем категорию из callback_data
+    result = await session.execute(select(Accounts).where(Accounts.categories == category))
+    account_list = result.scalars().all()
+    
+    if account_list:
+        for account in account_list:       
+            await cb.message.answer_photo(
+                photo=account.image , 
+                caption=f"Имя: {account.name}\nИгры: {account.gamesonaacaunt}\nЦена: {account.price}",
+                reply_markup=inkbcreate(btns={
+                    f"Подробнее о {account.name}": f"details_{account.name}_{account.description}"
+                })
+            )
+    else:
+        await cb.message.answer(
+            f'Нет аккаунтов в категории: {category}'
+            )
 
 
+@user_router.callback_query(F.data.startswith('details_'))
+async def account_details(cb: types.CallbackQuery, session: AsyncSession):
+    _, account_name, description = cb.data.split('_')
+    
+    # Получаем аккаунт из базы данных
+    result = await session.execute(select(Accounts).where(Accounts.name == account_name))
+    account = result.scalars().first()
 
+    if account:
+        account_info = (
+            f"Имя: {account.name}\n"
+            f"Описание: {description}\n"
+            f"Игры: {account.gamesonaacaunt}\n"
+            f"Цена: {account.price}"
+        )
+        
+        # Создаем кнопки для добавления в корзину и выбора другого аккаунта
+        buttons = {
+            "Добавить в корзину": f"addback_{account.name}",
+            "Выбрать другой аккаунт": "choose_another_account"
+        }
+        
+        keyboard = inkbcreate(btns=buttons)
+
+        await cb.message.answer(account_info, reply_markup=keyboard)
+    else:
+        await cb.message.answer("Аккаунт не найден.")
+
+@user_router.callback_query(F.data == 'choose_another_account')
+async def choose_another_account(cb: types.CallbackQuery, session: AsyncSession):
+    # Логика для отображения списка доступных аккаунтов
+    result = await session.execute(select(Accounts))
+    accounts = result.scalars().all()
+
+    if accounts:
+        accounts_buttons = {account.name: f"details_{account.name}_{account.description}" for account in accounts}
+        keyboard = inkbcreate(btns=accounts_buttons)
+
+        await cb.message.answer("Выберите другой аккаунт:", reply_markup=keyboard)
+    else:
+        await cb.message.answer("Нет доступных аккаунтов.")
+
+@user_router.callback_query(F.data.startswith('addback_'))
+async def addback(cb: types.CallbackQuery, session: AsyncSession):
+    account_name = cb.data.split('_')[1]  # Извлекаем имя аккаунта из callback_data
+
+    # Получаем аккаунт из базы данных
+    result = await session.execute(select(Accounts).where(Accounts.name == account_name))
+    account = result.scalars().first()
+
+    if account:
+        user_id = cb.from_user.id 
+        nameacc = account.name 
+        info_acc = f"{account.acclog},{account.accpass}"
+        imgacc = account.image 
+
+        # Создаем новый объект Backet
+        new_backet = Backet(username=user_id, image=imgacc, name=nameacc, infoacc=info_acc)
+
+        try:
+            session.add(new_backet)
+            await session.commit()
+            await cb.message.answer("Аккаунт успешно добавлен в корзину!",reply_markup=inkbcreate(btns={
+                'В главное меню':   'menu',
+                'Ещё аккаунт': ('allacc')
+            }))
+        except IntegrityError:
+            await session.rollback()
+            await cb.message.answer("Ошибка: аккаунт уже существует в корзине.",reply_markup=inkbcreate(btns={
+                'В главное меню':   'menu',
+                'Ещё аккаунт': ('allacc')
+                }))
+        except Exception as e:
+            await session.rollback()
+            await cb.message.answer(f"Произошла ошибка: {str(e)}")
+    else:
+        await cb.message.answer("Аккаунт не найден.")
 
 @user_router.callback_query(F.data == 'searchgame')
 async def search_game(callback: types.CallbackQuery):
@@ -142,7 +213,7 @@ async def search_game(callback: types.CallbackQuery):
         game_name = message.text  # Получаем название игры от пользователя
     
         # Выполняем запрос к базе данных
-        result = await session.execute(select(accounts).where(accounts.gamesonaacaunt.contains(game_name)))
+        result = await session.execute(select(Accounts).where(Accounts.gamesonaacaunt.contains(game_name)))
         account_list = result.scalars().all()
     
         if account_list:
@@ -167,15 +238,78 @@ async def search_game(callback: types.CallbackQuery):
                 'Другая игра?': 'searchgame',
                 'В главное меню': 'menu'
             }))
-    
 
-@user_router.callback_query(F.data == ('search_cat_ongame'))
-async def check_gamecat(callback: types.CallbackQuery):
-    await callback.answer()
-    await callback.message.answer(
-        "qwe"
-    )
 
+@user_router.callback_query(F.data == 'checkbacket')
+async def chekback(cb: types.CallbackQuery, session: AsyncSession):
+    user_id = cb.from_user.id
+
+    # Получаем все элементы корзины для данного пользователя
+    result = await session.execute(select(Backet).where(Backet.username == user_id))
+    backet_items = result.scalars().all()
+
+    if not backet_items:
+        await cb.message.answer("Ваша корзина пуста.")
+        return
+
+    account_messages = []
+
+    for item in backet_items:
+        # Разделяем информацию об аккаунте на логин и пароль
+        login, password = item.infoacc.split(',')
+
+        # Получаем аккаунт из базы данных по логину и паролю
+        account_result = await session.execute(
+            select(Accounts).where(Accounts.acclog == login, Accounts.accpass == password)
+        )
+        account = account_result.scalars().first()
+
+        if account:
+            # Формируем сообщение с информацией об аккаунте
+            account_info = (
+                f"Имя: {account.name}\n"
+                f"Цена: {account.price}\n"
+                f"Игры на аккаунте: {account.gamesonaacaunt}\n"
+            )
+
+            # Кнопки для взаимодействия
+            buttons = {
+                "Оплатить": f"pay_{account.name}",
+                "Убрать из корзины": f"remove_{account.name}"
+            }
+            keyboard = inkbcreate(btns=buttons)
+
+            account_messages.append((account_info, keyboard))
+        else:
+            account_messages.append(("Аккаунт не найден в системе.", None))
+
+    # Отправляем сообщения с информацией об аккаунтах
+    for account_info, keyboard in account_messages:
+        await cb.message.answer_photo(photo=account.image, caption=account_info, reply_markup=keyboard if keyboard else None)
+
+    await cb.answer()
+
+@user_router.callback_query(F.data.startswith('pay_'))
+async def pay_account(cb: types.CallbackQuery,):
+    account_name = cb.data.split('_')[1]
+    # Логика обработки оплаты (например, отправка пользователю информации о способах оплаты)
+    await cb.answer(f"Вы выбрали оплату для аккаунта: {account_name}")
+
+
+@user_router.callback_query(F.data.startswith('remove_'))
+async def remove_from_backet(cb: types.CallbackQuery, session: AsyncSession):
+    account_name = cb.data.split('_')[1]
+    username = cb.from_user.id
+    result = await session.execute(select(Backet).where(Backet.username == username, Backet.name == account_name))
+    accounts_to_remove = result.scalars().all()
+    if accounts_to_remove:
+        await session.execute(delete(Backet).where(Backet.username == username, Backet.name == account_name))
+        await cb.message.answer(f"Аккаунт {account_name} был убран из корзины.",reply_markup=inkbcreate(btns={
+            'В главное меню': 'menu'
+        }))
+        await session.commit()
+    else:
+        await cb.message.answer(f"Аккаунт {account_name} не найден в корзине.")
 
 @user_router.message()
 async def qwe(message: types.Message):
