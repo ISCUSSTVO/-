@@ -24,7 +24,7 @@ adm_router = Router()
 
 class addadminglobal(StatesGroup):
     plusadm = State()
-
+user_data = {}
 
 class addaccount(StatesGroup):
     name = State()
@@ -36,7 +36,7 @@ class addaccount(StatesGroup):
     acclogin = State()
     accpasword = State()
     accmail = State()
-    im4p = State()
+    imap = State()
 
     texts = {
         'addaccount.name':'Введите название заново',
@@ -48,7 +48,7 @@ class addaccount(StatesGroup):
         'addaccount.acclogin':'Введите логин  заново',
         'addaccount.accpasword':'Введите пароль заново',
         'addaccount.accmail':'Введите почту заново',
-        'addaccount.im4p':'Введите im4p  заново'
+        'addaccount.imap':'Введите imap  заново'
     }
 
 
@@ -274,11 +274,11 @@ async def addmail(message: types.Message,state: FSMContext):
     await message.reply(
         'Теперь пароль от почты'
     )
-    await state.set_state(addaccount.im4p)
+    await state.set_state(addaccount.imap)
 
-@adm_router.message(addaccount.im4p)
-async def addim4p(message: types.Message, session: AsyncSession, state: FSMContext):
-    await state.update_data(accim4p=message.text)
+@adm_router.message(addaccount.imap)
+async def addimap(message: types.Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(accimap=message.text)
     data = await state.get_data()
     # Создаем новый объект аккаунта
     newaccgame = Accounts(
@@ -291,7 +291,7 @@ async def addim4p(message: types.Message, session: AsyncSession, state: FSMConte
         acclog=data['accnewlogin'],
         accpass=data['accnewpassword'],
         accmail = data['accmail'],
-        im4p=data['accim4p']
+        imap=data['accimap']
     )
     image = data['acccim']
     qwe = data['accname']
@@ -364,7 +364,7 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
             "Изменить пароль": f"change_password_{account_name}",
             "Изменить почту": f"change_email_{account_name}",
             "Изменить изображение": f"change_image_{account_name}",
-            "Изменить im4p": f"change_im4p_{account_name}"
+            "Изменить imap": f"change_imap_{account_name}"
 
         })
     )
@@ -387,7 +387,7 @@ async def process_change_selection(cb: types.CallbackQuery, state: FSMContext):
         'password': "Введите новый пароль:",
         'email': "Введите новую почту:",
         'image': "Введите URL нового изображения:",
-        'im4p': "Введите новое im4p:"
+        'imap': "Введите новое imap:"
     }
 
     if change_type in prompts:
@@ -426,9 +426,9 @@ async def update_email(message: types.Message, state: FSMContext):
 async def update_image(message: types.Message, state: FSMContext):
     await update_account_field(message, state, 'image_url')
 
-@adm_router.message(StateFilter("new_im4p"))
-async def update_im4p(message: types.Message, state: FSMContext):
-    await update_account_field(message, state, 'im4p')
+@adm_router.message(StateFilter("new_imap"))
+async def update_imap(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'imap')
 
 async def update_account_field(message: types.Message, state: FSMContext, field_name: str):
     new_value = message.text

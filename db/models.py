@@ -23,7 +23,7 @@ class Accounts(Base):
     acclog: Mapped[str] = mapped_column(String)
     accpass: Mapped[str] = mapped_column(String)
     accmail: Mapped[str] = mapped_column(String)
-    im4p: Mapped[str] = mapped_column(String)
+    imap: Mapped[str] = mapped_column(String)
 
 class Backet(Base):
     __tablename__ = 'chumbacket'
