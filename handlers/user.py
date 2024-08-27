@@ -45,6 +45,7 @@ async def comm_cat(cb_or_msg: types.CallbackQuery | types.Message):
     )
 
 
+
 @user_router.message(F.text.lower().contains('аккаунты'))
 @user_router.callback_query(F.data == "allacc")
 async def view_all_accounts(message_or_query: types.Message | types.CallbackQuery, session: AsyncSession):
@@ -310,12 +311,12 @@ async def pay_account(cb: types.CallbackQuery,):
         'Получить код': f'takecode_{account_name}'
     }))
 
-@user_router.callback_query(F.data == 'takecode_')
+@user_router.callback_query(F.data.startswith('takecode_'))
 async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
     account_name = cb.data.split('_')[1]
     result = await session.execute(select(Accounts).where(Accounts.name == account_name))
     account = result.scalars().first()
-    user_data = (account.mail, account.imap)
+    user_data = (account.accmail, account.imap)
     try:
         loop = asyncio.get_event_loop()
         # Создание цикла событий asyncio
