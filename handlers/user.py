@@ -1,41 +1,43 @@
 from sqlite3 import IntegrityError
 from aiogram import types, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
+
 from aiogram import F
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
 from inlinekeyboars.inline_kbcreate import inkbcreate
 from db.models import Accounts, Backet
+from aiogram.fsm.state import StatesGroup
+from aiogram.fsm.context import FSMContext
+
 
 user_router = Router()
 
 
 account_list = [] 
 
+class Form(StatesGroup):
+    waiting_for_game_name = 'waiting_for_game_name'
 
-@user_router.message(F.text.lower().contains('старт'))
+
 @user_router.message(CommandStart())
-async def comm_start(message: types.Message):
-    await message.answer(
-        'Здарова', reply_markup=inkbcreate(btns={
-            'Главное меню': 'menu',
-        })
-    )
-
-@user_router.message(F.text.lower().contains('меню'))
+@user_router.message(F.text.lower().contains('старт'))
 @user_router.callback_query(F.data == ('menu'))
-async def comm_cat(callback: types.CallbackQuery):
-    await callback.message.answer(
+async def comm_cat(cb_or_msg: types.CallbackQuery | types.Message):
+    if isinstance(cb_or_msg, types.CallbackQuery):
+        await cb_or_msg.answer()
+        message = cb_or_msg.message
+    else:
+        message = cb_or_msg
+    await message.answer(
         'Выбирай что ты хочешь', reply_markup=inkbcreate(btns={
             'Ваша корзина': 'checkbacket',
             'Категории игр': 'categ',
             'Все доступные аккаунты': 'allacc',
             'Поиск аккаунта с игрой': 'searchgame',
-            'Определение категории по игре': 'search_cat_ongame'
-        })
+        }, sizes=(2,2))
     )
-
 
 
 @user_router.message(F.text.lower().contains('аккаунты'))
@@ -105,6 +107,7 @@ async def categor(cb: types.CallbackQuery, session: AsyncSession):
                 'В меню': 'menu'
             })
         )
+
 
 @user_router.callback_query(F.data.startswith('show_accounts:'))
 async def show_accounts(cb: types.CallbackQuery, session: AsyncSession):
@@ -206,38 +209,43 @@ async def addback(cb: types.CallbackQuery, session: AsyncSession):
         await cb.message.answer("Аккаунт не найден.")
 
 @user_router.callback_query(F.data == 'searchgame')
-async def search_game(callback: types.CallbackQuery):
+async def search_game(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Form.waiting_for_game_name)  # Устанавливаем состояние
     await callback.message.answer('Введи название игры')
-    @user_router.message()
-    async def process_game_name(message: types.Message, session: AsyncSession):
-        game_name = message.text  # Получаем название игры от пользователя
-    
-        # Выполняем запрос к базе данных
-        result = await session.execute(select(Accounts).where(Accounts.gamesonaacaunt.contains(game_name)))
-        account_list = result.scalars().all()
-    
-        if account_list:
-            for account in account_list:
-                desc_name = account.description if account.description else "Без описания"
-                price = account.price
-                
-                # Получаем список игр из аккаунта
-                games_on_account = account.gamesonaacaunt.split(',')  # Предполагаем, что игры разделены запятыми
-                games_list = "\n".join([f"- {game.strip()}" for game in games_on_account])
-    
-                # Формируем сообщение с информацией об аккаунте
-                message_text = f"Аккаунт:\nОписание: {desc_name}\nЦена: {price}\nИгры на аккаунте:\n{games_list}"
-    
-                # Отправляем сообщение с информацией об аккаунте
-                await message.answer(message_text, reply_markup=inkbcreate(btns={
-                    'Найти ещё': 'searchgame',
-                    'В главное меню': 'menu'
-                }))
-        else:
-            await message.answer("К сожалению, аккаунты с искомой игрой не найдены.", reply_markup=inkbcreate(btns={
-                'Другая игра?': 'searchgame',
-                'В главное меню': 'menu'
+
+@user_router.message(StateFilter(Form.waiting_for_game_name))
+async def process_game_name(message: types.Message, session: AsyncSession, state: FSMContext):
+    game_name = message.text  # Получаем название игры от пользователя
+
+    # Удаляем вызов session() и просто используем session
+    result = await session.execute(select(Accounts).where(Accounts.gamesonaacaunt.contains(game_name)))
+    account_list = result.scalars().all()
+
+    if account_list:
+        for account in account_list:
+            desc_name = account.description if account.description else "Без описания"
+            price = account.price
+            name = account.name
+            
+            games_on_account = account.gamesonaacaunt.split(',')
+            games_list = "\n".join([f"- {game.strip()}" for game in games_on_account])
+
+            message_text = f"Аккаунт: {name}\nОписание: {desc_name}\nЦена: {price}\nИгры на аккаунте:\n{games_list}"
+
+            await message.answer_photo(photo=account.image, caption=message_text, reply_markup=inkbcreate(btns={
+                'Найти ещё': 'searchgame',
+                'В главное меню': 'menu',
+                'Добавить в корзину': f'addback_{account.name}'
             }))
+    else:
+        await message.answer("К сожалению, аккаунты с искомой игрой не найдены.", reply_markup=inkbcreate(btns={
+            'Другая игра?': 'searchgame',
+            'В главное меню': 'menu'
+        }))
+
+    await state.clear()
+    
+    await state.clear()  # Завершаем состояние после обработки
 
 
 @user_router.callback_query(F.data == 'checkbacket')
@@ -310,6 +318,10 @@ async def remove_from_backet(cb: types.CallbackQuery, session: AsyncSession):
         await session.commit()
     else:
         await cb.message.answer(f"Аккаунт {account_name} не найден в корзине.")
+
+
+
+
 
 @user_router.message()
 async def qwe(message: types.Message):

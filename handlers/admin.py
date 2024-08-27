@@ -1,6 +1,6 @@
 from aiogram import types, Router
 from aiogram.filters import Command, StateFilter
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from aiogram import F
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Admlist, Accounts
 from inlinekeyboars.inline_kbcreate import inkbcreate
 import logging
+from db.engine import AsyncSessionLocal
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,7 +36,6 @@ class addaccount(StatesGroup):
     acclogin = State()
     accpasword = State()
     accmail = State()
-    accmailpasword = State()
     im4p = State()
 
     texts = {
@@ -47,13 +48,12 @@ class addaccount(StatesGroup):
         'addaccount.acclogin':'Введите логин  заново',
         'addaccount.accpasword':'Введите пароль заново',
         'addaccount.accmail':'Введите почту заново',
-        'addaccount.accmailpasword':'Введите пароль от почты заново',
         'addaccount.im4p':'Введите im4p  заново'
     }
 
 
 
-admin_list23 = ['krutoy_cell', 'Staryubogopodomniy', 'xuypisd']
+admin_list23 = ['krutoy_cell']
 
 @adm_router.message(Command('eta'))
 async def evrytimeadm(message: types.Message, session: AsyncSession):
@@ -83,7 +83,7 @@ async def evrytimeadm(message: types.Message, session: AsyncSession):
         )
 
 @adm_router.callback_query(F.data==('admin'))
-async def chek_adm1(cb: types.CallbackQuery, session: AsyncSession):
+async def chek_adm1(cb: types.CallbackQuery):
     await cb.message.answer(
         'Здарова броууууу', reply_markup=inkbcreate(btns={
             'Власть над админами': 'admcomm',
@@ -342,40 +342,119 @@ async def changeacc(cb: types.CallbackQuery, session: AsyncSession):
         )
 
 
-
-@adm_router.callback_query(F.data == ('chgacc'))
+@adm_router.callback_query(F.data.startswith('chgacc_'))
 async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
-    _, account_name, description = cb.data.split('_')
+    _, account_name = cb.data.split('_')
     
-    # Получаем аккаунт из базы данных
+    # Получаем информацию об аккаунте из базы данных
     result = await session.execute(select(Accounts).where(Accounts.name == account_name))
-    account = result.scalars().first()
+    account = result.scalar_one_or_none()
 
+    await cb.message.answer(
+        f"Вы выбрали аккаунт: {account.name}\n"
+        f"Игры: {account.gamesonaacaunt}\n"
+        f"Цена: {account.price}\n\n"
+        "Что вы хотите изменить?",
+        reply_markup=inkbcreate(btns={
+            "Изменить имя": f"change_name_{account_name}",
+            "Изменить игры": f"change_games_{account_name}",
+            "Изменить цену": f"change_price_{account_name}",
+            "Изменить описание": f"change_description_{account_name}",
+            "Изменить логин": f"change_login_{account_name}",
+            "Изменить пароль": f"change_password_{account_name}",
+            "Изменить почту": f"change_email_{account_name}",
+            "Изменить изображение": f"change_image_{account_name}",
+            "Изменить im4p": f"change_im4p_{account_name}"
 
+        })
+    )
+    
+    await cb.answer()  # Убираем уведомление о нажатой кнопке
+
+@adm_router.callback_query(F.data.startswith('change_'))
+async def process_change_selection(cb: types.CallbackQuery, state: FSMContext):
+    _, change_type, account_name = cb.data.split('_')
+
+    # Сохраняем имя аккаунта в состоянии
+    await state.update_data(account_name=account_name)
+
+    prompts = {
+        'name': "Введите новое имя:",
+        'games': "Введите новые игры:",
+        'price': "Введите новую цену:",
+        'description': "Введите новое описание:",
+        'login': "Введите новый логин:",
+        'password': "Введите новый пароль:",
+        'email': "Введите новую почту:",
+        'image': "Введите URL нового изображения:",
+        'im4p': "Введите новое im4p:"
+    }
+
+    if change_type in prompts:
+        await cb.message.answer(prompts[change_type])
+        await state.set_state(f"new_{change_type}")
+
+@adm_router.message(StateFilter("new_name"))
+async def update_name(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'name')
+
+@adm_router.message(StateFilter("new_games"))
+async def update_games(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'gamesonaacaunt')
+
+@adm_router.message(StateFilter("new_price"))
+async def update_price(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'price')
+
+@adm_router.message(StateFilter("new_description"))
+async def update_description(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'description')
+
+@adm_router.message(StateFilter("new_login"))
+async def update_login(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'login')
+
+@adm_router.message(StateFilter("new_password"))
+async def update_password(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'password')
+
+@adm_router.message(StateFilter("new_email"))
+async def update_email(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'email')
+
+@adm_router.message(StateFilter("new_image"))
+async def update_image(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'image_url')
+
+@adm_router.message(StateFilter("new_im4p"))
+async def update_im4p(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'im4p')
+
+async def update_account_field(message: types.Message, state: FSMContext, field_name: str):
+    new_value = message.text
+    user_data = await state.get_data()
+    account_name = user_data.get('account_name')
+
+    
+    async with AsyncSessionLocal as session:  # Используйте AsyncSessionLocal
+        await session.execute(
+            update(Accounts).where(Accounts.name == account_name).values({field_name: new_value})
+        )
+        await session.commit()
+
+    
+    await message.answer(f"{field_name.replace('_', ' ').capitalize()} аккаунта обновлено на: {new_value}")
+    await state.finish()
 
 @adm_router.callback_query(F.data.startswith('delacc_'))
 async def dellgacc(cb: types.CallbackQuery, session: AsyncSession):
-    logging.info(f"Удаление аккаунта: {cb.data}")
     desc_name = cb.data.split('_')[1]
-    
-    # Выполняем запрос на получение аккаунта по имени
-    result = await session.execute(select(Accounts).where(Accounts.name == desc_name))
-    accounts_to_remove = result.scalars().all()
-    
-    if accounts_to_remove:
-        # Удаляем аккаунт из базы данных
-        await session.execute(delete(Accounts).where(Accounts.name == desc_name))
-        await session.commit()  # Подтверждаем изменения в базе данных
-        
-        await cb.answer(f"Аккаунт {desc_name} был удален")
-        await cb.message.answer(
-            f"Аккаунт {desc_name} был удален",
-            reply_markup=inkbcreate(btns={
-                'В главное меню': 'menu'
-            })
-        )
-    else:
-        await cb.answer(f"Аккаунт {desc_name} не найден.")
+    await session.execute(
+    delete(Accounts).where(Accounts.name ==desc_name)
+    )
+    await session.commit()
+    await cb.message.answer(f'Аккаунт {desc_name} удалён.')
+    await cb.message.delete()
 
 ##################ПРОВЕРКА НА АДМИНА################################################################
 @adm_router.callback_query(F.data ==('chekadm'))

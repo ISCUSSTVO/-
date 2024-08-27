@@ -5,7 +5,9 @@ from db.models import Base
 
 engine = create_async_engine(os.getenv('DB_LITE'), echo = True)
 
+
 session_maker = async_sessionmaker(bind = engine, class_=AsyncSession)
+AsyncSessionLocal = session_maker(bind=engine, expire_on_commit=False)
 
 async def create_db():
     async with engine.begin() as conn:
