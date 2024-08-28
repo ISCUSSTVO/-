@@ -19,7 +19,8 @@ user_router = Router()
 
 
 account_list = [] 
-IMAP_SERVER = "smtp.mail.ru"
+IMAP_SERVER = "imap.mail.ru"
+SMTP_SERVER = "smtp.mail.ru"
 
 
 class Form(StatesGroup):
@@ -311,39 +312,49 @@ async def pay_account(cb: types.CallbackQuery,):
         'Получить код': f'takecode_{account_name}'
     }))
 
+
 @user_router.callback_query(F.data.startswith('takecode_'))
 async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
     account_name = cb.data.split('_')[1]
     result = await session.execute(select(Accounts).where(Accounts.name == account_name))
     account = result.scalars().first()
     user_data = (account.accmail, account.imap)
+
+    if user_data is None:
+        await cb.message.answer("Не удалось получить данные из почтового ящика")
+        return
+
     try:
         loop = asyncio.get_event_loop()
-        # Создание цикла событий asyncio
-        if user_data is None:
-            await cb.message.answer("Не удалось получить данные из почтового ящика")
-            return
-        # Проверка наличия данных пользователя из почтового ящика
 
         mail_connection = await loop.run_in_executor(
             None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
         )
-        # Установка защищенного соединения с почтовым сервером
-
         mail_connection.login(user_data[0], user_data[1])
         mail_connection.select("INBOX")
-        # Вход в почтовый ящик и выбор папки "INBOX"
 
-        data = mail_connection.search(None, "FROM", '"Steam"')
         # Поиск писем от Steam
+        status, email_ids = mail_connection.search(None, 'FROM "Steam"')
+        
+        if status != 'OK':
+            await cb.message.answer("Ошибка при поиске писем.")
+            return
 
-        latest_email_id = data[0].split()[-1]
-        data = mail_connection.fetch(latest_email_id, "(RFC822)")
-        # Извлечение последнего письма от Steam
+        email_ids = email_ids[0].split()
+        
+        if not email_ids:
+            await cb.message.answer("Нет писем от Steam.")
+            return
+
+        latest_email_id = email_ids[-1].decode()  # Убедитесь, что ID в строковом формате
+        status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
+        
+        if status != 'OK':
+            await cb.message.answer(f"Ошибка при получении письма: {status}")
+            return
 
         raw_email = data[0][1]
         email_message = email.message_from_bytes(raw_email)
-        # Извлечение содержимого письма
 
         decoded_payload = None
         if email_message.is_multipart():
@@ -353,7 +364,6 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
                     break
         else:
             decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
-        # Декодирование содержимого письма
 
         if decoded_payload:
             match = re.search(r'Код доступа(.*?)Если это были не вы', decoded_payload, re.DOTALL)
@@ -364,14 +374,12 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
                 await cb.message.answer("Не удалось найти заданные фразы в письме")
         else:
             await cb.message.answer("Не удалось декодировать содержимое письма")
-        # Извлечение кода доступа из письма и отправка его пользователю
 
     except Exception as e:
         await cb.message.answer(f"Произошла ошибка при чтении почты: {e}")
     finally:
         if "mail_connection" in locals():
             mail_connection.logout()
-
 
 
 @user_router.callback_query(F.data.startswith('remove_'))
