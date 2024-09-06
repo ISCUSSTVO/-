@@ -1,6 +1,7 @@
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+##################Создание инлайн клавиатуры  ################################################################
 def inkbcreate(
     *,
     btns: dict[str, str],

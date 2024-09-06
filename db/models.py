@@ -5,12 +5,14 @@ class Base(DeclarativeBase):
     created: Mapped[DateTime] = mapped_column(DateTime, default = func.now())
     updated: Mapped[DateTime] = mapped_column(DateTime, default = func.now() , onupdate= func.now())
 
+##################Дтаблица админов################################################################
 class Admlist(Base):
     __tablename__ = 'admins'
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)
     usernameadm: Mapped[str] = mapped_column(String)
 
+##################таблица аккаунтов################################################################
 class Accounts(Base):
     __tablename__ = 'allacc'
 
@@ -25,6 +27,7 @@ class Accounts(Base):
     accmail: Mapped[str] = mapped_column(String)
     imap: Mapped[str] = mapped_column(String)
 
+##################таблица корзины ################################################################
 class Backet(Base):
     __tablename__ = 'chumbacket'
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)

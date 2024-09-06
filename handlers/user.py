@@ -46,7 +46,7 @@ async def comm_cat(cb_or_msg: types.CallbackQuery | types.Message):
     )
 
 
-
+##################Список всех аккаунтов в будующем только кнопки################################################################
 @user_router.message(F.text.lower().contains('аккаунты'))
 @user_router.callback_query(F.data == "allacc")
 async def view_all_accounts(message_or_query: types.Message | types.CallbackQuery, session: AsyncSession):
@@ -81,11 +81,11 @@ async def view_all_accounts(message_or_query: types.Message | types.CallbackQuer
                 await message.answer(account_info, reply_markup=keyboard)
     else:
         await message.answer(
-            'Нет аккаунтов братик', reply_markup=inkbcreate(btns={
+            'Нет аккаунтов ', reply_markup=inkbcreate(btns={
                 'В меню': 'menu'
             })
         )
-
+##################Список всех категорий в будующем только кнопки################################################################
 @user_router.callback_query(F.data == 'categ')
 async def categor(cb: types.CallbackQuery, session: AsyncSession):
     result = await session.execute(select(Accounts))
@@ -115,7 +115,7 @@ async def categor(cb: types.CallbackQuery, session: AsyncSession):
             })
         )
 
-
+##################Список всех аккаунтов в категории в будующем только кнопки################################################################
 @user_router.callback_query(F.data.startswith('show_accounts:'))
 async def show_accounts(cb: types.CallbackQuery, session: AsyncSession):
     category = cb.data.split(':')[1]  # Получаем категорию из callback_data
@@ -136,7 +136,7 @@ async def show_accounts(cb: types.CallbackQuery, session: AsyncSession):
             f'Нет аккаунтов в категории: {category}'
             )
 
-
+##################Детали аккаунта################################################################
 @user_router.callback_query(F.data.startswith('details_'))
 async def account_details(cb: types.CallbackQuery, session: AsyncSession):
     _, account_name, description = cb.data.split('_')
@@ -165,6 +165,8 @@ async def account_details(cb: types.CallbackQuery, session: AsyncSession):
     else:
         await cb.message.answer("Аккаунт не найден.")
 
+
+##################Выбор другого аккаунта################################################################
 @user_router.callback_query(F.data == 'choose_another_account')
 async def choose_another_account(cb: types.CallbackQuery, session: AsyncSession):
     # Логика для отображения списка доступных аккаунтов
@@ -179,6 +181,7 @@ async def choose_another_account(cb: types.CallbackQuery, session: AsyncSession)
     else:
         await cb.message.answer("Нет доступных аккаунтов.")
 
+##################Добавление акакаунта в корзину ################################################################
 @user_router.callback_query(F.data.startswith('addback_'))
 async def addback(cb: types.CallbackQuery, session: AsyncSession):
     account_name = cb.data.split('_')[1]  # Извлекаем имя аккаунта из callback_data
@@ -215,6 +218,7 @@ async def addback(cb: types.CallbackQuery, session: AsyncSession):
     else:
         await cb.message.answer("Аккаунт не найден.")
 
+##################Поиск игры################################################################
 @user_router.callback_query(F.data == 'searchgame')
 async def search_game(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Form.waiting_for_game_name)  # Устанавливаем состояние
@@ -251,10 +255,9 @@ async def process_game_name(message: types.Message, session: AsyncSession, state
         }))
 
     await state.clear()
-    
-    await state.clear()  # Завершаем состояние после обработки
 
 
+##################Корзина ################################################################
 @user_router.callback_query(F.data == 'checkbacket')
 async def chekback(cb: types.CallbackQuery, session: AsyncSession):
     user_id = cb.from_user.id
@@ -303,7 +306,7 @@ async def chekback(cb: types.CallbackQuery, session: AsyncSession):
         await cb.message.answer_photo(photo=account.image, caption=account_info, reply_markup=keyboard if keyboard else None)
 
     await cb.answer()
-
+##################Обработчик оплаты ################################################################
 @user_router.callback_query(F.data.startswith('pay_'))
 async def pay_account(cb: types.CallbackQuery,):
     account_name = cb.data.split('_')[1]
@@ -312,7 +315,7 @@ async def pay_account(cb: types.CallbackQuery,):
         'Получить код': f'takecode_{account_name}'
     }))
 
-
+##################Получиение кода с почты ################################################################
 @user_router.callback_query(F.data.startswith('takecode_'))
 async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
     account_name = cb.data.split('_')[1]
@@ -381,7 +384,7 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
         if "mail_connection" in locals():
             mail_connection.logout()
 
-
+##################Удаление акакаунта из корзины ################################################################
 @user_router.callback_query(F.data.startswith('remove_'))
 async def remove_from_backet(cb: types.CallbackQuery, session: AsyncSession):
     account_name = cb.data.split('_')[1]
@@ -400,7 +403,7 @@ async def remove_from_backet(cb: types.CallbackQuery, session: AsyncSession):
 
 
 
-
+##################обработчик сообщений вне команд################################################################
 @user_router.message()
 async def qwe(message: types.Message):
     await message.answer(
