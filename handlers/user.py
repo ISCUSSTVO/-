@@ -1,19 +1,18 @@
 import asyncio
-from sqlite3 import IntegrityError
-from aiogram import types, Router
-from aiogram.filters import CommandStart, StateFilter
 import re
 import email
 import imaplib
+from aiogram import types, Router
+from aiogram.filters import CommandStart, StateFilter
 from aiogram import F
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
-from inlinekeyboars.inline_kbcreate import inkbcreate
-from db.models import Accounts, Backet
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
+from db.models import Accounts
 from aiogram.fsm.state import StatesGroup
 from aiogram.fsm.context import FSMContext
-
+from handlers.menu_proccesing import get_menu_content
 
 user_router = Router()
 
@@ -27,23 +26,46 @@ class Form(StatesGroup):
     waiting_for_game_name = 'waiting_for_game_name'
 
 
+#@user_router.message(CommandStart())
+#@user_router.message(F.text.lower().contains('старт'))
+#@user_router.callback_query(F.data == ('menu'))
+#async def comm_cat(cb_or_msg: types.CallbackQuery | types.Message):
+#    if isinstance(cb_or_msg, types.CallbackQuery):
+#        await cb_or_msg.answer()
+#        message = cb_or_msg.message
+#    else:
+#        message = cb_or_msg
+#    await message.answer(
+#        'Выбирай что ты хочешь', reply_markup=inkbcreate(btns={
+#            'Ваша корзина': 'checkbacket',
+#            'Категории игр': 'categ',
+#            'Все доступные аккаунты': 'allacc',
+#            'Поиск аккаунта с игрой': 'searchgame',
+#        }, sizes=(2,2))
+#    )
+
 @user_router.message(CommandStart())
-@user_router.message(F.text.lower().contains('старт'))
-@user_router.callback_query(F.data == ('menu'))
-async def comm_cat(cb_or_msg: types.CallbackQuery | types.Message):
-    if isinstance(cb_or_msg, types.CallbackQuery):
-        await cb_or_msg.answer()
-        message = cb_or_msg.message
-    else:
-        message = cb_or_msg
-    await message.answer(
-        'Выбирай что ты хочешь', reply_markup=inkbcreate(btns={
-            'Ваша корзина': 'checkbacket',
-            'Категории игр': 'categ',
-            'Все доступные аккаунты': 'allacc',
-            'Поиск аккаунта с игрой': 'searchgame',
-        }, sizes=(2,2))
+async def start (message: types.Message, session: AsyncSession):
+    media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
+    await message.answer_photo(media.media, caption=media.caption, reply_markup=reply_markup)
+
+@user_router.callback_query(Menucallback.filter())
+async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, session: AsyncSession):
+    media, reply_markup = await get_menu_content(
+        session,
+        level=callback_data.level,
+        menu_name=callback_data.menu_name,
+        page=callback_data.page  # Убедитесь, что передаете текущую страницу
     )
+
+    if media is None or reply_markup is None:
+        await callback.answer("Нет доступных услуг.")
+        return
+
+    await callback.message.answer_media_group(media=[media])  # Если это медиагруппа
+    await callback.message.answer("zxcqwe", reply_markup=reply_markup)
+    await callback.answer()
+
 
 
 ##################Список всех аккаунтов в будующем только кнопки################################################################
@@ -182,41 +204,6 @@ async def choose_another_account(cb: types.CallbackQuery, session: AsyncSession)
         await cb.message.answer("Нет доступных аккаунтов.")
 
 ##################Добавление акакаунта в корзину ################################################################
-@user_router.callback_query(F.data.startswith('addback_'))
-async def addback(cb: types.CallbackQuery, session: AsyncSession):
-    account_name = cb.data.split('_')[1]  # Извлекаем имя аккаунта из callback_data
-
-    # Получаем аккаунт из базы данных
-    result = await session.execute(select(Accounts).where(Accounts.name == account_name))
-    account = result.scalars().first()
-
-    if account:
-        user_id = cb.from_user.id 
-        nameacc = account.name 
-        info_acc = f"{account.acclog},{account.accpass}"
-        imgacc = account.image 
-
-        # Создаем новый объект Backet
-        new_backet = Backet(username=user_id, image=imgacc, name=nameacc, infoacc=info_acc)
-
-        try:
-            session.add(new_backet)
-            await session.commit()
-            await cb.message.answer("Аккаунт успешно добавлен в корзину!",reply_markup=inkbcreate(btns={
-                'В главное меню':   'menu',
-                'Ещё аккаунт': ('allacc')
-            }))
-        except IntegrityError:
-            await session.rollback()
-            await cb.message.answer("Ошибка: аккаунт уже существует в корзине.",reply_markup=inkbcreate(btns={
-                'В главное меню':   'menu',
-                'Ещё аккаунт': ('allacc')
-                }))
-        except Exception as e:
-            await session.rollback()
-            await cb.message.answer(f"Произошла ошибка: {str(e)}")
-    else:
-        await cb.message.answer("Аккаунт не найден.")
 
 ##################Поиск игры################################################################
 @user_router.callback_query(F.data == 'searchgame')
@@ -258,54 +245,7 @@ async def process_game_name(message: types.Message, session: AsyncSession, state
 
 
 ##################Корзина ################################################################
-@user_router.callback_query(F.data == 'checkbacket')
-async def chekback(cb: types.CallbackQuery, session: AsyncSession):
-    user_id = cb.from_user.id
 
-    # Получаем все элементы корзины для данного пользователя
-    result = await session.execute(select(Backet).where(Backet.username == user_id))
-    backet_items = result.scalars().all()
-
-    if not backet_items:
-        await cb.message.answer("Ваша корзина пуста.")
-        return
-
-    account_messages = []
-
-    for item in backet_items:
-        # Разделяем информацию об аккаунте на логин и пароль
-        login, password = item.infoacc.split(',')
-
-        # Получаем аккаунт из базы данных по логину и паролю
-        account_result = await session.execute(
-            select(Accounts).where(Accounts.acclog == login, Accounts.accpass == password)
-        )
-        account = account_result.scalars().first()
-
-        if account:
-            # Формируем сообщение с информацией об аккаунте
-            account_info = (
-                f"Имя: {account.name}\n"
-                f"Цена: {account.price}\n"
-                f"Игры на аккаунте: {account.gamesonaacaunt}\n"
-            )
-
-            # Кнопки для взаимодействия
-            buttons = {
-                "Оплатить": f"pay_{account.name}",
-                "Убрать из корзины": f"remove_{account.name}"
-            }
-            keyboard = inkbcreate(btns=buttons)
-
-            account_messages.append((account_info, keyboard))
-        else:
-            account_messages.append(("Аккаунт не найден в системе.", None))
-
-    # Отправляем сообщения с информацией об аккаунтах
-    for account_info, keyboard in account_messages:
-        await cb.message.answer_photo(photo=account.image, caption=account_info, reply_markup=keyboard if keyboard else None)
-
-    await cb.answer()
 ##################Обработчик оплаты ################################################################
 @user_router.callback_query(F.data.startswith('pay_'))
 async def pay_account(cb: types.CallbackQuery,):
@@ -384,28 +324,10 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
         if "mail_connection" in locals():
             mail_connection.logout()
 
-##################Удаление акакаунта из корзины ################################################################
-@user_router.callback_query(F.data.startswith('remove_'))
-async def remove_from_backet(cb: types.CallbackQuery, session: AsyncSession):
-    account_name = cb.data.split('_')[1]
-    username = cb.from_user.id
-    result = await session.execute(select(Backet).where(Backet.username == username, Backet.name == account_name))
-    accounts_to_remove = result.scalars().all()
-    if accounts_to_remove:
-        await session.execute(delete(Backet).where(Backet.username == username, Backet.name == account_name))
-        await cb.message.answer(f"Аккаунт {account_name} был убран из корзины.",reply_markup=inkbcreate(btns={
-            'В главное меню': 'menu'
-        }))
-        await session.commit()
-    else:
-        await cb.message.answer(f"Аккаунт {account_name} не найден в корзине.")
-
-
-
 
 ##################обработчик сообщений вне команд################################################################
 @user_router.message()
-async def qwe(message: types.Message):
+async def messagevnecommand(message: types.Message):
     await message.answer(
         text='Мужик нажми на интерисующую комманду', reply_markup=inkbcreate(btns={
                 'В меню': 'menu'

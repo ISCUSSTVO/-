@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Admlist, Accounts
+from db.orm_query import orm_get_info_pages, orm_change_banner_image
 from inlinekeyboars.inline_kbcreate import inkbcreate
 import logging
 from db.engine import AsyncSessionLocal
@@ -53,7 +54,7 @@ class addaccount(StatesGroup):
 
 
 
-adminlist = ['krutoy_cell']
+adminlist = ['civqw']
 ####################################АВТОДОБАВЛЕНИЕ АДМИНА ИЗ ЛИСТА ADMINLIST####################################
 @adm_router.message(Command('eta'))
 async def evrytimeadm(message: types.Message, session: AsyncSession):
@@ -82,31 +83,23 @@ async def evrytimeadm(message: types.Message, session: AsyncSession):
             'ты не админ'
         )
 ####################################АДМ МЕНЮ КОЛЛБЕК####################################
-@adm_router.callback_query(F.data==('admin'))
-async def chek_adm1(cb: types.CallbackQuery):
-    await cb.message.answer(
-        'Здарова броууууу', reply_markup=inkbcreate(btns={
-            'Власть над админами': 'admcomm',
-            'Власть над аккаунтами': 'acccomm'
-        })
-    )
-
-    await cb.message.delete()
-
-####################################АДМ МЕНЮ МСГ####################################
 @adm_router.message(Command('ad'))
-async def chek_adm(message: types.Message, session: AsyncSession):
-    
+@adm_router.callback_query(F.data==('admin'))
+async def chek_adm1(cb_or_msg: types.CallbackQuery | types.Message, session: AsyncSession):
+    if isinstance(cb_or_msg, types.CallbackQuery):
+        await cb_or_msg.answer()
+        message = cb_or_msg.message
+    else:
+        message = cb_or_msg
     result = await session.execute(select(Admlist))
     admin_list = result.scalars().all()
-
     admin_usernames = [admin.usernameadm for admin in admin_list]
-
     if message.from_user.username in admin_usernames:
         await message.answer(
             'Здарова броууууу', reply_markup=inkbcreate(btns={
                 'Власть над админами': 'admcomm',
-                'Власть над аккаунтами': 'acccomm'
+                'Власть над аккаунтами': 'acccomm',
+                'Добавить изменить банер':  'banner'
             })
         )
     else:
@@ -114,6 +107,26 @@ async def chek_adm(message: types.Message, session: AsyncSession):
             'ты не админ'
         )
         await message.delete()
+
+####################################АДМ МЕНЮ МСГ####################################
+#@adm_router.message(Command('ad'))
+#async def chek_adm(message: types.Message, session: AsyncSession):
+    #
+    #result = await session.execute(select(Admlist))
+    #admin_list = result.scalars().all()
+    #admin_usernames = [admin.usernameadm for admin in admin_list]
+    #if message.from_user.username in admin_usernames:
+    #    await message.answer(
+    #        'Здарова броууууу', reply_markup=inkbcreate(btns={
+    #            'Власть над админами': 'admcomm',
+    #            'Власть над аккаунтами': 'acccomm'
+    #        })
+    #    )
+    #else:
+    #    await message.answer(
+    #        'ты не админ'
+    #    )
+    #    await message.delete()
 ####################################АДМ МЕНЮ####################################
 @adm_router.callback_query(F.data == ('admcomm'))
 async def commadm(cb: types.CallbackQuery,):
@@ -188,6 +201,39 @@ async def cancel_hand(msg: types.Message, state: FSMContext):
         'меню': 'admin'
     }))
 
+
+################# Микро FSM для загрузки/изменения баннеров ############################
+
+class AddBanner(StatesGroup):
+    image = State()
+
+# Отправляем перечень информационных страниц бота и становимся в состояние отправки photo
+@adm_router.callback_query(StateFilter(None), F.data == ('banner'))
+async def add_image2(cb: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+    pages_names = [page.name for page in await orm_get_info_pages(session)]
+    await cb.message.answer(f"Отправьте фото баннера.\nВ описании укажите для какой страницы:\
+                         \n{', '.join(pages_names)}")
+    await state.set_state(AddBanner.image)
+
+# Добавляем/изменяем изображение в таблице (там уже есть записанные страницы по именам:
+# main, catalog, cart(для пустой корзины), about, payment, shipping
+@adm_router.message(AddBanner.image, F.photo)
+async def add_banner(message: types.Message, state: FSMContext, session: AsyncSession):
+    image_id = message.photo[-1].file_id
+    for_page = message.caption.strip()
+    pages_names = [page.name for page in await orm_get_info_pages(session)]
+    if for_page not in pages_names:
+        await message.answer(f"Введите нормальное название страницы, например:\
+                         \n{', '.join(pages_names)}")
+        return
+    await orm_change_banner_image(session, for_page, image_id,)
+    await message.answer("Баннер добавлен/изменен.")
+    await state.clear()
+
+# ловим некоррекный ввод
+@adm_router.message(AddBanner.image)
+async def add_banner2(message: types.Message):
+    await message.answer("Отправьте фото баннера или отмена")
 ##################Назад к прошлому стейту################################################################ 
 @adm_router.message(F.text.casefold()==('назад'))
 async def backstep(msg: types.Message,state: FSMContext):
