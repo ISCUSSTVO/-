@@ -10,6 +10,7 @@ class Menucallback(CallbackData, prefix ="menu"):
     page: int = 0
 
 
+
 ##################Создание инлайн клавиатуры  ################################################################
 def inkbcreate(
     *,
@@ -48,7 +49,7 @@ def get_services_btns(
     *,
     level: int,
     page: int,
-    pagination_btns: dict,
+    pagination_btns: list,
     service_id: int,
     sizes: tuple[int] = (2, 1)
 ):
@@ -74,12 +75,12 @@ def get_services_btns(
     keyboard.adjust(*sizes)
 
     row = []
-    for text, menu_name in pagination_btns.items():
+    for text, menu_name in pagination_btns:
         if menu_name == "next":
             row.append(InlineKeyboardButton(
                 text=text,
                 callback_data=Menucallback(
-                    level=level,
+                    level=level,  # Оставляем уровень неизменным
                     menu_name=menu_name,
                     page=page + 1
                 ).pack()
@@ -88,7 +89,7 @@ def get_services_btns(
             row.append(InlineKeyboardButton(
                 text=text,
                 callback_data=Menucallback(
-                    level=level,
+                    level=level,  # Оставляем уровень неизменным
                     menu_name=menu_name,
                     page=page - 1
                 ).pack()

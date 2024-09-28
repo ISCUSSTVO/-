@@ -48,7 +48,7 @@ class Form(StatesGroup):
 
 @user_router.message(F.text.lower().contains('start'), CommandStart())
 async def start (message: types.Message, session: AsyncSession):
-    media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
+    media, reply_markup = await get_menu_content(session, level=0, menu_name="main", game_name=game_name)
     await message.answer_photo(media.media, caption=media.caption, reply_markup=reply_markup)
 
 @user_router.callback_query(Menucallback.filter())
@@ -56,7 +56,7 @@ async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, 
     media, reply_markup, *_ = await get_menu_content(
         session,
         level=callback_data.level,
-        menu_name=callback_data.menu_name,
+        menu_name=callback_data.menu_name
     )
 
     await callback.message.edit_media(media=media, reply_markup=reply_markup)
@@ -67,9 +67,11 @@ async def process_game_selection(callback_query: types.CallbackQuery):
     game_name = callback_query.data.split('_')[1]  # Извлекаем название игры
     await callback_query.answer()  # Подтверждаем нажатие кнопки
     
+    level = 2  # Установите нужный уровень здесь (например, 1 или любое другое значение)
+
     async with session_maker() as session:  # Создаем новую сессию
         async with session.begin():  # Начинаем транзакцию
-            image, kbds = await gamecatalog(session, game_name, page=1)  # Получаем список изображений
+            image, kbds = await gamecatalog(session, game_name, page=1, level=level)  # Передаем уровень
             
             if image:
                 media = InputMediaPhoto(
