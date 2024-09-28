@@ -7,12 +7,13 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram import F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from db.engine import session_maker
 from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
 from db.models import Accounts
 from aiogram.fsm.state import StatesGroup
 from aiogram.fsm.context import FSMContext
-from handlers.menu_proccesing import get_menu_content
+from handlers.menu_proccesing import gamecatalog, get_menu_content
 
 user_router = Router()
 
@@ -44,28 +45,40 @@ class Form(StatesGroup):
 #        }, sizes=(2,2))
 #    )
 
-@user_router.message(CommandStart())
+
+@user_router.message(F.text.lower().contains('start'), CommandStart())
 async def start (message: types.Message, session: AsyncSession):
     media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
     await message.answer_photo(media.media, caption=media.caption, reply_markup=reply_markup)
 
 @user_router.callback_query(Menucallback.filter())
 async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, session: AsyncSession):
-    media, reply_markup = await get_menu_content(
+    media, reply_markup, *_ = await get_menu_content(
         session,
         level=callback_data.level,
         menu_name=callback_data.menu_name,
-        page=callback_data.page  # Убедитесь, что передаете текущую страницу
     )
 
-    if media is None or reply_markup is None:
-        await callback.answer("Нет доступных услуг.")
-        return
-
-    await callback.message.answer_media_group(media=[media])  # Если это медиагруппа
-    await callback.message.answer("zxcqwe", reply_markup=reply_markup)
+    await callback.message.edit_media(media=media, reply_markup=reply_markup)
     await callback.answer()
-
+  
+@user_router.callback_query(lambda c: c.data.startswith('game_'))
+async def process_game_selection(callback_query: types.CallbackQuery):
+    game_name = callback_query.data.split('_')[1]  # Извлекаем название игры
+    await callback_query.answer()  # Подтверждаем нажатие кнопки
+    
+    async with session_maker() as session:  # Создаем новую сессию
+        async with session.begin():  # Начинаем транзакцию
+            image, kbds = await gamecatalog(session, game_name, page=1)  # Получаем список изображений
+            
+            if image:
+                media = InputMediaPhoto(
+                    media=image.media,
+                    caption=image.caption
+                )
+                await callback_query.message.edit_media(media=media, reply_markup=kbds)
+            else:
+                await callback_query.message.answer(text="Нет доступных аккаунтов.")
 
 
 ##################Список всех аккаунтов в будующем только кнопки################################################################
@@ -326,10 +339,7 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
 
 
 ##################обработчик сообщений вне команд################################################################
+
 @user_router.message()
 async def messagevnecommand(message: types.Message):
-    await message.answer(
-        text='Мужик нажми на интерисующую комманду', reply_markup=inkbcreate(btns={
-                'В меню': 'menu'
-        })
-    )
+    await message.answer('Введи команду start')

@@ -2,10 +2,12 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+
+
 class Menucallback(CallbackData, prefix ="menu"):
     level: int
     menu_name: str
-    page: int = 1
+    page: int = 0
 
 
 ##################Создание инлайн клавиатуры  ################################################################
@@ -27,7 +29,6 @@ def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
     keyboard = InlineKeyboardBuilder()
     btns = {
         "Аккаунты": "catalog",
-        "Корзина": "cart",
         "О нас ": "about",
         "Оплата": "payment",
         }
@@ -43,7 +44,6 @@ def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
             
     return keyboard.adjust(*sizes).as_markup()
 
-
 def get_services_btns(
     *,
     level: int,
@@ -54,27 +54,44 @@ def get_services_btns(
 ):
     keyboard = InlineKeyboardBuilder()
 
-    keyboard.add(InlineKeyboardButton(text='Назад',
-                callback_data=Menucallback(level=level-1, menu_name='catalog').pack()))
-    keyboard.add(InlineKeyboardButton(text='Купить 💵',
-                callback_data=Menucallback(level=level, menu_name='add_to_cart', service_id=service_id).pack()))
+    # Уменьшаем уровень на 1 для кнопки "Назад"
+    back_level = level - 1
+
+    keyboard.add(InlineKeyboardButton(
+        text='Назад',
+        callback_data=Menucallback(level=back_level, menu_name='back').pack()
+    ))
+
+    keyboard.add(InlineKeyboardButton(
+        text='Купить 💵',
+        callback_data=Menucallback(
+            level=level,
+            menu_name='add_to_cart',
+            service_id=service_id
+        ).pack()
+    ))
 
     keyboard.adjust(*sizes)
 
     row = []
     for text, menu_name in pagination_btns.items():
         if menu_name == "next":
-            row.append(InlineKeyboardButton(text=text,
-                    callback_data=Menucallback(
-                        level=level,
-                        menu_name=menu_name,
-                        page=page + 1).pack()))
-
+            row.append(InlineKeyboardButton(
+                text=text,
+                callback_data=Menucallback(
+                    level=level,
+                    menu_name=menu_name,
+                    page=page + 1
+                ).pack()
+            ))
         elif menu_name == "previous":
-            row.append(InlineKeyboardButton(text=text,
-                    callback_data=Menucallback(
-                        level=level,
-                        menu_name=menu_name,
-                        page=page - 1).pack()))
+            row.append(InlineKeyboardButton(
+                text=text,
+                callback_data=Menucallback(
+                    level=level,
+                    menu_name=menu_name,
+                    page=page - 1
+                ).pack()
+            ))
 
     return keyboard.row(*row).as_markup()

@@ -386,7 +386,7 @@ async def showallaccounts(cb: types.CallbackQuery, session: AsyncSession):
     else:
         await cb.message.answer(
             'Нет аккаунтов, братик', reply_markup=inkbcreate(btns={
-                'В меню': 'acccom'
+                'В меню': 'admcomm'
             })
         )
 
@@ -491,10 +491,11 @@ async def update_account_field(message: types.Message, state: FSMContext, field_
         await session.execute(
             update(Accounts).where(Accounts.name == account_name).values({field_name: new_value})
         )
-    await session.commit()
+
 
     
     await message.answer(f"{field_name.replace('_', ' ').capitalize()} аккаунта обновлено на: {new_value}")
+    await session.commit()
     await state.clear()
 ##################Удаление аккаунта ################################################################
 @adm_router.callback_query(F.data.startswith('delacc_'))
