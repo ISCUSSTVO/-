@@ -54,7 +54,3 @@ async def orm_get_accounts_by_game(session: AsyncSession, game_name: str):
     
     print(f"Accounts found for {game_name}: {accounts}")  # Отладочное сообщение
     return accounts
-
-async def get_accounts_raw(session: AsyncSession, game_name: str):
-    result = await session.execute("SELECT * FROM accounts WHERE name = :name", {'name': game_name})
-    return result.fetchall()

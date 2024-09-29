@@ -72,7 +72,9 @@ async def catalog(session):
         "inline_keyboard": [game_buttons]
     }
 
+
     return image, kbds
+
 
 
 async def gamecatalog(session, level, page, game_name):
@@ -93,9 +95,6 @@ async def gamecatalog(session, level, page, game_name):
                 caption=f"{service.name}\nОписание: {service.description}\nСтоимость: {round(service.price, 2)}\n"
                         f"Аккаунт {paginator.page} из {paginator.pages}",
             )
-        else:
-            image = None
-            print('No image found for the service')
     else:
         image = None
         print('No services found') 
@@ -108,7 +107,6 @@ async def gamecatalog(session, level, page, game_name):
         pagination_btns=pagination_btns,
         service_id=current_services[0].id if current_services else None,
     )
-
     return image, kbds
 
 
@@ -126,12 +124,10 @@ async def get_menu_content(
     
     if level == 1:
         return await catalog(session)
-    
+
     elif level == 2:
         if game_name:  # Проверяем, что game_name не None
             image, kbds = await gamecatalog(session, level, page, game_name)  # Распаковка значений
             return image, kbds
-        else:
-            return None, None
 
 

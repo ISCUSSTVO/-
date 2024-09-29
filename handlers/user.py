@@ -45,6 +45,7 @@ class Form(StatesGroup):
 #        }, sizes=(2,2))
 #    )
 
+@user_router.message(F.text.lower().contains('старт'))
 @user_router.message(CommandStart())
 async def start (message: types.Message, session: AsyncSession):
     media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
@@ -72,17 +73,16 @@ async def handle_game_selection(callback_query: types.CallbackQuery, session):
 
     image, kbds = await gamecatalog(session, level, page, game_name)
 
-    media = None
     print(f"Game name: {game_name}")
-    print(f"Image: {image}")
+    print(f"Image: {image}")  # Проверка содержимого image
+    print(f"Keyboards: {kbds}")
 
+    media = None
     if image:
         media = InputMediaPhoto(
-            media=image.media,
+            media=image.media,  # Убедитесь, что image.media не None
             caption=image.caption,
         )
-    
-    if media and isinstance(media, InputMediaPhoto):
         await callback_query.message.edit_media(media=media, reply_markup=kbds)
     else:
         await callback_query.answer("Изображение не найдено.", show_alert=True)
@@ -357,7 +357,5 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
 @user_router.message()
 async def messagevnecommand(message: types.Message):
     await message.answer(
-        text='Мужик нажми на интерисующую комманду', reply_markup=inkbcreate(btns={
-                'В меню': 'menu'
-        })
+    'Мужик напиши старт'
     )

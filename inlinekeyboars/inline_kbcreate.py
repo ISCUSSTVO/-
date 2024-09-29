@@ -77,3 +77,35 @@ def get_services_btns(
                         page=page - 1).pack()))
 
     return keyboard.row(*row).as_markup()
+
+def get_services_btns2(
+    *,
+    level: int,
+    page: int,
+    pagination_btns: dict,
+    sizes: tuple[int] = (2, 1)
+):
+    keyboard = InlineKeyboardBuilder()
+    back_level = level -1 
+    keyboard.add(InlineKeyboardButton(text='Назад',
+                callback_data=Menucallback(level=back_level, menu_name='catalog').pack()))
+
+    keyboard.adjust(*sizes)
+
+    row = []
+    for text, menu_name in pagination_btns.items():
+        if menu_name == "next":
+            row.append(InlineKeyboardButton(text=text,
+                    callback_data=Menucallback(
+                        level=level,
+                        menu_name=menu_name,
+                        page=page + 1).pack()))
+
+        elif menu_name == "previous":
+            row.append(InlineKeyboardButton(text=text,
+                    callback_data=Menucallback(
+                        level=level,
+                        menu_name=menu_name,
+                        page=page - 1).pack()))
+
+    return keyboard.row(*row).as_markup()
