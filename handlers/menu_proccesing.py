@@ -1,6 +1,7 @@
 from aiogram.types import InputMediaPhoto
-from db.orm_query import orm_check_catalogs, orm_get_banner ,orm_check_catalog
-#from db.models import Accounts
+#from sqlalchemy import select
+from db.orm_query import orm_get_accounts_by_game, orm_get_banner ,orm_check_catalog
+#from db.models import Account
 from inlinekeyboars.inline_kbcreate import get_services_btns, get_user_main_btns
 
 
@@ -11,29 +12,24 @@ from utils.paginator import Paginator
 
 
 def pages(paginator: Paginator):
-    btns = []
-
+    btns = dict()
     if paginator.has_previous():
-        btns.append(("◀ Пред.", "previous"))
+        btns["◀ Пред."] = "previous"
 
     if paginator.has_next():
-        btns.append(("След. ▶", "next"))
+        btns["След. ▶"] = "next"
 
     return btns
 
 
-
 async def main(session, menu_name, level):
     banner = await orm_get_banner(session, menu_name)
+    image = InputMediaPhoto(media = banner.image, caption=banner.description)
 
-    if banner is None:
-        # Обработка случая, когда баннер не найден
-        return "Баннер не найден", get_user_main_btns(level=level)
-
-    image = InputMediaPhoto(media=banner.image, caption=banner.description)
     kbds = get_user_main_btns(level=level)
 
     return image, kbds
+
 
 
 async def catalog(session):
@@ -44,14 +40,12 @@ async def catalog(session):
     accounts = await orm_check_catalog(session)
 
     # Формируем сообщение с аккаунтами
-    accounts_list = "\n".join([f"{account.gamesonaacaunt}" for account in accounts])  # Замените на актуальные поля
+    accounts_list = "\n".join([f"{account.gamesonaacaunt}" for account in accounts])
 
     if banner:
         image = InputMediaPhoto(
             media=banner.image,
-            caption=(
-                f"Игры:\n{accounts_list}"
-            ),
+            caption=f"Игры:\n{accounts_list}",
         )
     else:
         image = None
@@ -59,7 +53,6 @@ async def catalog(session):
     # Создаем кнопки с названиями игр
     game_buttons = []
     game_count = {}
-
 
     for account in accounts:
         game_name = account.gamesonaacaunt
@@ -72,55 +65,52 @@ async def catalog(session):
     for game_name, count in game_count.items():
         game_buttons.append({
             "text": f"{game_name} ({count})",  # Название игры с количеством
-            "callback_data": f"game_{game_name}"  # Передаем название игры
+            "callback_data": f"show_game_{game_name}"  # Передаем название игры
         })
 
     kbds = {
-        "inline_keyboard": [game_buttons]  
+        "inline_keyboard": [game_buttons]
     }
 
     return image, kbds
 
-async def gamecatalog(session: AsyncSession, game_name: str, page: int, level: int):
-    # Получаем все аккаунты для конкретной игры
-    accounts = await orm_check_catalogs(session, game_name)
 
-    # Группируем аккаунты по игре
-    grouped_accounts = {}
-    for account in accounts:
-        game = account.gamesonaacaunt
-        if game not in grouped_accounts:
-            grouped_accounts[game] = []
-        grouped_accounts[game].append(account)
+async def gamecatalog(session, level, page, game_name):
+    services = await orm_get_accounts_by_game(session, game_name)
+    paginator = Paginator(services, page=page)
 
-    # Создаем экземпляр Paginator
-    try:
-        paginator = Paginator(grouped_accounts.get(game_name, []), page=page)
-    except ValueError as e:
-        print(f"Ошибка пагинации: {e}")
-        return None, None
+    current_services = paginator.get_page()
 
-    current_account = paginator.get_page()
+    print(f"Current services for {game_name}: {current_services}")
+    print(f"Current page: {paginator.page}, Total pages: {paginator.pages}")
 
-    if not current_account:
-        return None, None
+    if current_services:
+        service = current_services[0]
+        print(f"Service image: {service.image}")
+        if service.image:
+            image = InputMediaPhoto(
+            media=service.image,
+                caption=f"{service.name}\nОписание: {service.description}\nСтоимость: {round(service.price, 2)}\n"
+                        f"Аккаунт {paginator.page} из {paginator.pages}",
+            )
+        else:
+            image = None
+            print('No image found for the service')
+    else:
+        image = None
+        print('No services found') 
 
-    account = current_account[0]  # Берем текущий аккаунт для отображения
-    account_info = f"Аккаунт: {account.name}\n{account.description}\nЦена: {account.price}"
+    pagination_btns = pages(paginator)
 
-    # Предполагаем, что у аккаунта есть поле image для картинки
-    image = InputMediaPhoto(
-        media=account.image,
-        caption=account_info
-    )
     kbds = get_services_btns(
-        pagination_btns=pages(paginator),
         level=level,
         page=page,
-        service_id=123
+        pagination_btns=pagination_btns,
+        service_id=current_services[0].id if current_services else None,
     )
 
     return image, kbds
+
 
 
 
@@ -128,17 +118,20 @@ async def get_menu_content(
     session: AsyncSession,
     level: int,
     menu_name: str,
-    game_name: str,
+    game_name: str = None,  # Убедитесь, что параметр может быть None
     page: int | None = None,
-    
-
 ):
     if level == 0:
         return await main(session=session, level=level, menu_name=menu_name)
-    elif level == 1:
+    
+    if level == 1:
         return await catalog(session)
+    
     elif level == 2:
-        return await gamecatalog(session, page=page, level=level,game_name=game_name)
-
+        if game_name:  # Проверяем, что game_name не None
+            image, kbds = await gamecatalog(session, level, page, game_name)  # Распаковка значений
+            return image, kbds
+        else:
+            return None, None
 
 

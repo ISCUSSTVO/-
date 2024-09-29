@@ -7,8 +7,8 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram import F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
-from db.engine import session_maker
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton,  InputMediaPhoto
+from db.engine import AsyncSessionLocal
 from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
 from db.models import Accounts
 from aiogram.fsm.state import StatesGroup
@@ -45,42 +45,55 @@ class Form(StatesGroup):
 #        }, sizes=(2,2))
 #    )
 
-
-@user_router.message(F.text.lower().contains('start'), CommandStart())
+@user_router.message(CommandStart())
 async def start (message: types.Message, session: AsyncSession):
-    media, reply_markup = await get_menu_content(session, level=0, menu_name="main", game_name=game_name)
+    media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
     await message.answer_photo(media.media, caption=media.caption, reply_markup=reply_markup)
 
 @user_router.callback_query(Menucallback.filter())
 async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, session: AsyncSession):
+    page = callback_data.page if callback_data.page is not None else 1  # Убедитесь, что страница не None
+
     media, reply_markup, *_ = await get_menu_content(
         session,
         level=callback_data.level,
-        menu_name=callback_data.menu_name
+        menu_name=callback_data.menu_name,
+        page=page  # Передаем страницу
     )
 
     await callback.message.edit_media(media=media, reply_markup=reply_markup)
     await callback.answer()
-  
-@user_router.callback_query(lambda c: c.data.startswith('game_'))
-async def process_game_selection(callback_query: types.CallbackQuery):
-    game_name = callback_query.data.split('_')[1]  # Извлекаем название игры
-    await callback_query.answer()  # Подтверждаем нажатие кнопки
-    
-    level = 2  # Установите нужный уровень здесь (например, 1 или любое другое значение)
 
-    async with session_maker() as session:  # Создаем новую сессию
-        async with session.begin():  # Начинаем транзакцию
-            image, kbds = await gamecatalog(session, game_name, page=1, level=level)  # Передаем уровень
-            
-            if image:
-                media = InputMediaPhoto(
-                    media=image.media,
-                    caption=image.caption
-                )
-                await callback_query.message.edit_media(media=media, reply_markup=kbds)
-            else:
-                await callback_query.message.answer(text="Нет доступных аккаунтов.")
+
+async def handle_game_selection(callback_query: types.CallbackQuery, session):
+    game_name = callback_query.data.split('_')[2]
+    level = 2 
+    page = 1
+
+    image, kbds = await gamecatalog(session, level, page, game_name)
+
+    media = None
+    print(f"Game name: {game_name}")
+    print(f"Image: {image}")
+
+    if image:
+        media = InputMediaPhoto(
+            media=image.media,
+            caption=image.caption,
+        )
+    
+    if media and isinstance(media, InputMediaPhoto):
+        await callback_query.message.edit_media(media=media, reply_markup=kbds)
+    else:
+        await callback_query.answer("Изображение не найдено.", show_alert=True)
+
+
+@user_router.callback_query(lambda c: c.data.startswith('show_game_'))
+async def process_game_selection(callback_query: types.CallbackQuery):
+
+    async with AsyncSessionLocal as session:
+        await handle_game_selection(callback_query, session)
+
 
 
 ##################Список всех аккаунтов в будующем только кнопки################################################################
@@ -341,7 +354,10 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
 
 
 ##################обработчик сообщений вне команд################################################################
-
 @user_router.message()
 async def messagevnecommand(message: types.Message):
-    await message.answer('Введи команду start')
+    await message.answer(
+        text='Мужик нажми на интерисующую комманду', reply_markup=inkbcreate(btns={
+                'В меню': 'menu'
+        })
+    )
