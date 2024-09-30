@@ -53,46 +53,69 @@ async def start (message: types.Message, session: AsyncSession):
 
 @user_router.callback_query(Menucallback.filter())
 async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, session: AsyncSession):
-    page = callback_data.page if callback_data.page is not None else 1  # Убедитесь, что страница не None
+    page = callback_data.page if callback_data.page is not None else 1
 
-    media, reply_markup, *_ = await get_menu_content(
+    result = await get_menu_content(
         session,
         level=callback_data.level,
         menu_name=callback_data.menu_name,
-        page=page  # Передаем страницу
+        page=page
     )
+
+    if result is None:
+        await callback.answer("Не удалось получить данные.", show_alert=True)
+        return
+
+    media, reply_markup = result
 
     await callback.message.edit_media(media=media, reply_markup=reply_markup)
     await callback.answer()
 
-
-async def handle_game_selection(callback_query: types.CallbackQuery, session):
-    game_name = callback_query.data.split('_')[2]
-    level = 2 
-    page = 1
-
-    image, kbds = await gamecatalog(session, level, page, game_name)
-
-    print(f"Game name: {game_name}")
-    print(f"Image: {image}")  # Проверка содержимого image
-    print(f"Keyboards: {kbds}")
-
-    media = None
-    if image:
-        media = InputMediaPhoto(
-            media=image.media,  # Убедитесь, что image.media не None
-            caption=image.caption,
-        )
-        await callback_query.message.edit_media(media=media, reply_markup=kbds)
-    else:
-        await callback_query.answer("Изображение не найдено.", show_alert=True)
-
-
 @user_router.callback_query(lambda c: c.data.startswith('show_game_'))
 async def process_game_selection(callback_query: types.CallbackQuery):
+    game_name = callback_query.data.split('_')[2]  # Получаем имя игры
+    page = 1  # Начальная страница
+    level = 2  # Уровень, который вам нужен
 
+    # Правильное использование AsyncSessionLocal
     async with AsyncSessionLocal as session:
-        await handle_game_selection(callback_query, session)
+        await handle_game_selection(callback_query, session, game_name, page, level)
+
+
+
+
+
+async def handle_game_selection(callback_query: types.CallbackQuery, session, game_name, level, page):
+    image, kbds = await gamecatalog(session, level, page, game_name)
+
+    if image is None or kbds is None:
+        await callback_query.answer("Не удалось получить данные об игре.", show_alert=True)
+        return
+
+    media = InputMediaPhoto(
+        media=image.media,
+        caption=image.caption,
+    )
+    await callback_query.message.edit_media(media=media, reply_markup=kbds)
+
+
+@user_router.callback_query(lambda c: c.data in ["previous", "next"])
+async def process_pagination(callback_query: types.CallbackQuery):
+    data = callback_query.data
+    current_page = int(callback_query.message.reply_markup.inline_keyboard[0][0].callback_data.split('_')[-1])
+    game_name = callback_query.message.reply_markup.inline_keyboard[0][0].callback_data.split('_')[2]  # Имя игры
+    level = 2  # Уровень, который вам нужен
+
+    if data == "next":
+        current_page += 1
+    elif data == "previous":
+        current_page -= 1
+
+    async with AsyncSessionLocal() as session:
+        image, kbds = await gamecatalog(session, level=level, page=current_page, game_name=game_name)
+
+        await callback_query.message.edit_media(image=image, reply_markup=kbds)
+
 
 
 
@@ -354,6 +377,10 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
 
 
 ##################обработчик сообщений вне команд################################################################
+@user_router.message(F.text.lower().contains('йо'))
+async def yow(msg: types.Message):
+    await msg.answer('ЙОООООООООООООООООООООООу')
+
 @user_router.message()
 async def messagevnecommand(message: types.Message):
     await message.answer(

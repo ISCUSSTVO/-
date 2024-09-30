@@ -83,31 +83,30 @@ async def gamecatalog(session, level, page, game_name):
 
     current_services = paginator.get_page()
 
-    print(f"Current services for {game_name}: {current_services}")
-    print(f"Current page: {paginator.page}, Total pages: {paginator.pages}")
-
     if current_services:
         service = current_services[0]
-        print(f"Service image: {service.image}")
         if service.image:
             image = InputMediaPhoto(
-            media=service.image,
+                media=service.image,
                 caption=f"{service.name}\nОписание: {service.description}\nСтоимость: {round(service.price, 2)}\n"
                         f"Аккаунт {paginator.page} из {paginator.pages}",
             )
+        else:
+            image = None
     else:
         image = None
-        print('No services found') 
 
     pagination_btns = pages(paginator)
 
     kbds = get_services_btns(
         level=level,
-        page=page,
+        page=paginator.page,
         pagination_btns=pagination_btns,
         service_id=current_services[0].id if current_services else None,
     )
+    
     return image, kbds
+
 
 
 
@@ -116,7 +115,7 @@ async def get_menu_content(
     session: AsyncSession,
     level: int,
     menu_name: str,
-    game_name: str = None,  # Убедитесь, что параметр может быть None
+    game_name: str = None,
     page: int | None = None,
 ):
     if level == 0:
@@ -126,8 +125,10 @@ async def get_menu_content(
         return await catalog(session)
 
     elif level == 2:
-        if game_name:  # Проверяем, что game_name не None
-            image, kbds = await gamecatalog(session, level, page, game_name)  # Распаковка значений
-            return image, kbds
+        if game_name:
+            return await gamecatalog(session, level, page, game_name)
+
+    # Возвращаем значения по умолчанию
+    return None
 
 
