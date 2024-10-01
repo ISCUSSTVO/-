@@ -15,7 +15,7 @@ from handlers.admin import adm_router
 from handlers.user import user_router
 
 
-bot = Bot(token=os.getenv('TOKEN'))
+bot = Bot(token=os.getenv('TOKEN'), )
 dp = Dispatcher()
 
 dp.include_routers(adm_router, user_router)

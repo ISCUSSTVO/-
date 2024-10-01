@@ -47,10 +47,10 @@ async def orm_check_catalog(session: AsyncSession):
     result = await session.execute(query)
     return result.scalars().all()
 
-async def orm_get_accounts_by_game(session: AsyncSession, game_name: str):
-    query = select(Accounts).where(Accounts.gamesonaacaunt == game_name )
+async def orm_get_accounts_by_game(session: AsyncSession, game_cat: str):
+    query = select(Accounts).where(Accounts.categories == game_cat )
     result = await session.execute(query)
     accounts = result.scalars().all()
     
-    print(f"Accounts found for {game_name}: {accounts}")  # Отладочное сообщение
+    print(f"Accounts found for {game_cat}: {accounts}")  # Отладочное сообщение
     return accounts

@@ -54,7 +54,7 @@ class addaccount(StatesGroup):
 
 
 
-adminlist = ['civqw', 'xuypisd']
+adminlist = ['civqw']
 ####################################АВТОДОБАВЛЕНИЕ АДМИНА ИЗ ЛИСТА ADMINLIST####################################
 @adm_router.message(Command('eta'))
 async def evrytimeadm(message: types.Message, session: AsyncSession):
@@ -111,23 +111,22 @@ async def chek_adm1(cb_or_msg: types.CallbackQuery | types.Message, session: Asy
 ####################################АДМ МЕНЮ МСГ####################################
 #@adm_router.message(Command('ad'))
 #async def chek_adm(message: types.Message, session: AsyncSession):
-    #
-    #result = await session.execute(select(Admlist))
-    #admin_list = result.scalars().all()
-    #admin_usernames = [admin.usernameadm for admin in admin_list]
-    #if message.from_user.username in admin_usernames:
-    #    await message.answer(
-    #        'Здарова броууууу', reply_markup=inkbcreate(btns={
-    #            'Власть над админами': 'admcomm',
-    #            'Власть над аккаунтами': 'acccomm'
-    #        })
-    #    )
-    #else:
-    #    await message.answer(
-    #        'ты не админ'
-    #    )
-    #    await message.delete()
-####################################АДМ МЕНЮ####################################
+#   result = await session.execute(select(Admlist))
+#   admin_list = result.scalars().all()
+#   admin_usernames = [admin.usernameadm for admin in admin_list]
+#   if message.from_user.username in admin_usernames:
+#       await message.answer(
+#           'Здарова броууууу', reply_markup=inkbcreate(btns={
+#               'Власть над админами': 'admcomm',
+#               'Власть над аккаунтами': 'acccomm'
+#           })
+#       )
+#   else:
+#       await message.answer(
+#           'ты не админ'
+#       )
+#       await message.delete()
+###################################АДМ МЕНЮ####################################
 @adm_router.callback_query(F.data == ('admcomm'))
 async def commadm(cb: types.CallbackQuery,):
     await cb.message.answer(
@@ -182,13 +181,7 @@ async def handle_username_to_add(msg: types.Message, session: AsyncSession, stat
     )
 
 
-##################Добавление аккаунта################################################################
-@adm_router.callback_query(StateFilter(None), F.data == ('Plus_acc'))
-async def addadmin1(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(
-        text='Введи имя аккаунта'
-    )
-    await state.set_state(addaccount.name)
+
 
 ##################Отмена действия ################################################################
 @adm_router.message(StateFilter('*'), F.text.casefold()==('отмена'))
@@ -251,12 +244,11 @@ async def backstep(msg: types.Message,state: FSMContext):
                 f"Вы вернулись к предыдущему шагу\n{addaccount.texts[prev.state]}"
             )
         prev = step
-
-@adm_router.message(addaccount.name)
-async def addname(message: types.Message, state: FSMContext):
-    await state.update_data(accname = message.text)
-    await message.answer(
-        text='Введи описание аккаунта'
+##################Добавление аккаунта################################################################
+@adm_router.callback_query(StateFilter(None), F.data == ('Plus_acc'))
+async def addadmin1(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer(
+        text='Введи описание'
     )
     await state.set_state(addaccount.desc)
 
@@ -331,7 +323,6 @@ async def addimap(message: types.Message, session: AsyncSession, state: FSMConte
     data = await state.get_data()
     # Создаем новый объект аккаунта
     newaccgame = Accounts(
-        name=data['accname'],
         description=data['accdesc'],
         gamesonaacaunt=data['accgame'],
         price=data['priceacc'],
@@ -343,7 +334,7 @@ async def addimap(message: types.Message, session: AsyncSession, state: FSMConte
         imap=data['accimap']
     )
     image = data['acccim']
-    qwe = data['accname']
+    qwe = data['accdesc']
     price = data['priceacc']
 
     # Добавляем и коммитим в сессии базы данных
@@ -354,7 +345,7 @@ async def addimap(message: types.Message, session: AsyncSession, state: FSMConte
     # Отправляем изображение вместе с текстом
     await message.reply_photo(
         photo=image,
-        caption=f'Аккаунт добавлен\nНазвание: {qwe}\nЦена: {price}',
+        caption=f'Аккаунт добавлен\nОписание: {qwe}\nЦена: {price} rub',
         reply_markup=inkbcreate(btns={
             'Ещё аккаунт?': 'Plus_acc',
             'Админ меню': 'admin'
@@ -368,7 +359,7 @@ async def showallaccounts(cb: types.CallbackQuery, session: AsyncSession):
 
     if account_list:
         for account in account_list:
-            desc_name = account.name if account.name else "Без названия"
+            desc_name = account.description if account.description else "Без названия"
             account_info = (
                 f"Аккаунт: {desc_name}\n"
                 f"Игры: {account.gamesonaacaunt}\n"
@@ -396,7 +387,7 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
     _, account_name = cb.data.split('_')
     
     # Получаем информацию об аккаунте из базы данных
-    result = await session.execute(select(Accounts).where(Accounts.name == account_name))
+    result = await session.execute(select(Accounts).where(Accounts.description == account_name))
     account = result.scalar_one_or_none()
 
     await cb.message.answer(
@@ -405,7 +396,6 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
         f"Цена: {account.price}\n\n"
         "Что вы хотите изменить?",
         reply_markup=inkbcreate(btns={
-            "Изменить имя": f"change_name_{account_name}",
             "Изменить игры": f"change_games_{account_name}",
             "Изменить цену": f"change_price_{account_name}",
             "Изменить описание": f"change_description_{account_name}",
@@ -430,7 +420,6 @@ async def process_change_selection(cb: types.CallbackQuery, state: FSMContext):
     await state.update_data(account_name=account_name)
 
     prompts = {
-        'name': "Введите новое имя:",
         'games': "Введите новые игры:",
         'price': "Введите новую цену:",
         'description': "Введите новое описание:",
@@ -445,9 +434,6 @@ async def process_change_selection(cb: types.CallbackQuery, state: FSMContext):
         await cb.message.answer(prompts[change_type])
         await state.set_state(f"new_{change_type}")
 
-@adm_router.message(StateFilter("new_name"))
-async def update_name(message: types.Message, state: FSMContext):
-    await update_account_field(message, state, 'name')
 
 @adm_router.message(StateFilter("new_games"))
 async def update_games(message: types.Message, state: FSMContext):
@@ -501,7 +487,7 @@ async def update_account_field(message: types.Message, state: FSMContext, field_
 async def dellgacc(cb: types.CallbackQuery, session: AsyncSession):
     desc_name = cb.data.split('_')[1]
     await session.execute(
-    delete(Accounts).where(Accounts.name ==desc_name)
+    delete(Accounts).where(Accounts.description ==desc_name)
     )
     await session.commit()
     await cb.message.answer(f'Аккаунт {desc_name} удалён.')

@@ -7,13 +7,14 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram import F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton,  InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from db.engine import AsyncSessionLocal
+from db.orm_query import orm_get_accounts_by_game
 from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
 from db.models import Accounts
 from aiogram.fsm.state import StatesGroup
 from aiogram.fsm.context import FSMContext
-from handlers.menu_proccesing import gamecatalog, get_menu_content
+from handlers.menu_proccesing import gamecatalog, get_menu_content, handle_game_selection, viewgame
 
 user_router = Router()
 
@@ -61,6 +62,7 @@ async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, 
         menu_name=callback_data.menu_name,
         page=page
     )
+    print(result)
 
     if result is None:
         await callback.answer("Не удалось получить данные.", show_alert=True)
@@ -71,50 +73,34 @@ async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, 
     await callback.message.edit_media(media=media, reply_markup=reply_markup)
     await callback.answer()
 
+
+@user_router.callback_query(lambda c: c.data.startswith('show_cat_'))
+async def process_show_game(callback_query: types.CallbackQuery):
+    level = 2
+    page = 1  # Начальная страниц
+    # Извлекаем категорию из колбек-данных
+    game_cat = callback_query.data.split('_')[2]  # Получаем название категории
+    async with AsyncSessionLocal as session:
+        # Получаем контент меню для уровня 2 (каталог игр)
+        message_text, kbds = await gamecatalog(session, game_cat, level, page)
+
+        # Отправляем сообщение пользователю
+        await callback_query.message.answer(message_text, reply_markup=kbds)
+        await callback_query.answer()
+
+
 @user_router.callback_query(lambda c: c.data.startswith('show_game_'))
 async def process_game_selection(callback_query: types.CallbackQuery):
     game_name = callback_query.data.split('_')[2]  # Получаем имя игры
     page = 1  # Начальная страница
-    level = 2  # Уровень, который вам нужен
+    level = 3  # Уровень, который вам нужен
 
     # Правильное использование AsyncSessionLocal
     async with AsyncSessionLocal as session:
-        await handle_game_selection(callback_query, session, game_name, page, level)
+        await handle_game_selection(callback_query, session, game_name,  level, page)
 
 
 
-
-
-async def handle_game_selection(callback_query: types.CallbackQuery, session, game_name, level, page):
-    image, kbds = await gamecatalog(session, level, page, game_name)
-
-    if image is None or kbds is None:
-        await callback_query.answer("Не удалось получить данные об игре.", show_alert=True)
-        return
-
-    media = InputMediaPhoto(
-        media=image.media,
-        caption=image.caption,
-    )
-    await callback_query.message.edit_media(media=media, reply_markup=kbds)
-
-
-@user_router.callback_query(lambda c: c.data in ["previous", "next"])
-async def process_pagination(callback_query: types.CallbackQuery):
-    data = callback_query.data
-    current_page = int(callback_query.message.reply_markup.inline_keyboard[0][0].callback_data.split('_')[-1])
-    game_name = callback_query.message.reply_markup.inline_keyboard[0][0].callback_data.split('_')[2]  # Имя игры
-    level = 2  # Уровень, который вам нужен
-
-    if data == "next":
-        current_page += 1
-    elif data == "previous":
-        current_page -= 1
-
-    async with AsyncSessionLocal() as session:
-        image, kbds = await gamecatalog(session, level=level, page=current_page, game_name=game_name)
-
-        await callback_query.message.edit_media(image=image, reply_markup=kbds)
 
 
 
