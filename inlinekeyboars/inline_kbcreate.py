@@ -113,15 +113,29 @@ def get_services_btns2(
 def get_services_btns3(
     *,
     level: int,
-    service_id: int,
     sizes: tuple[int] = (2, 1)
 ):
     keyboard = InlineKeyboardBuilder()
     back_level = level -1 
     keyboard.add(InlineKeyboardButton(text='Назад',
                 callback_data=Menucallback(level=back_level, menu_name='catalog').pack()))
+
+    keyboard.adjust(*sizes)
+    return keyboard.as_markup()
+
+
+def get_services_btns4(
+    *,
+    level: int,
+    service_id: int,
+    sizes: tuple[int] = (2, 1)
+):
+    keyboard = InlineKeyboardBuilder()
+
     keyboard.add(InlineKeyboardButton(text='Купить 💵',
                 callback_data=Menucallback(level=level, menu_name='add_to_cart', service_id=service_id).pack()))
 
     keyboard.adjust(*sizes)
+
+
     return keyboard.as_markup()

@@ -54,3 +54,14 @@ async def orm_get_accounts_by_game(session: AsyncSession, game_cat: str):
     
     print(f"Accounts found for {game_cat}: {accounts}")  # Отладочное сообщение
     return accounts
+
+async def orm_get_accounts_by_game1(session: AsyncSession, game: str):
+    query = select(Accounts).where(Accounts.gamesonaacaunt == game )
+    result = await session.execute(query)
+    accounts = result.scalars().all()
+    
+    print(f"Accounts found for {game}: {accounts}")  # Отладочное сообщение
+    return accounts
+
+
+

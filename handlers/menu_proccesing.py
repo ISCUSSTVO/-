@@ -1,12 +1,13 @@
 from aiogram import types
+import aiogram
 from aiogram.types import InputMediaPhoto
 from aiogram import Router
 
 # from sqlalchemy import select
-from db.orm_query import orm_get_accounts_by_game, orm_get_banner, orm_check_catalog
+from db.orm_query import orm_get_accounts_by_game, orm_get_banner, orm_check_catalog, orm_get_accounts_by_game1
 
 # from db.models import Account
-from inlinekeyboars.inline_kbcreate import get_services_btns3, get_user_main_btns
+from inlinekeyboars.inline_kbcreate import get_services_btns, get_services_btns3, get_user_main_btns
 
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,33 +80,38 @@ async def categ(session):
     return image, kbds
 
 
-async def gamecatalog(session: AsyncSession, game_cat: str, level, page):
+async def gamecatalog(session: AsyncSession, game_cat: str, level):
+    banner = await orm_get_banner(session, "catalog")
     # Получаем игры по категории из базы данных
     games = await orm_get_accounts_by_game(session, game_cat)
-    paginator = Paginator(games, page=page)
-    service = paginator.get_page()[0]
     # Формируем список игр для отображения
-    if games:
-        games_list = "\n".join(
-            [f"{game.gamesonaacaunt}: {game.description}" for game in games]
-        )  # Предполагается, что у игры есть поля name и description
-
+    games_list = "\n".join(
+        [f"{game.gamesonaacaunt}" for game in games]
+        )  
+    if banner:
+        image = InputMediaPhoto(
+            media=banner.image,
+            caption=f"Игры:\n{games_list}\nВведи игру формате gamename_название игры ",
+        )
+    else:
+        image = None
     kbds = get_services_btns3(
         level=level,
-        service_id=service.id,
     )
 
-    return games_list, kbds
+    return image, kbds
+
+
 
 
 async def handle_game_selection(
-    callback_query: types.CallbackQuery, session, game_name, level, page
+    message: types.Message, session, game, level, page
 ):
-    image, kbds = await viewgame(session, level, page, game_name)
+    image, kbds = await viewgame(session, level, page, game)
     print(image, kbds)
     if image is None or kbds is None:
         print(image, kbds)
-        await callback_query.answer(
+        await message.answer(
             "Не удалось получить данные об игре.", show_alert=True
         )
         return
@@ -114,27 +120,34 @@ async def handle_game_selection(
         media=image.media,
         caption=image.caption,
     )
-    await callback_query.message.edit_media(media=media, reply_markup=kbds)
+    try:
+        await message.edit_media(media=media, reply_markup=kbds)
+    except aiogram.exceptions.TelegramBadRequest as e:
+        print(f"Error editing message: {e}")
+        await message.answer(f"Не удалось отредактировать сообщение.{e}")
 
-
-async def viewgame(session, level, page, game_name):
-    services = await orm_get_accounts_by_game(session, game_name)
+async def viewgame(session, level, page, game):
+    services = await orm_get_accounts_by_game1(session, game)
     paginator = Paginator(services, page=page)
 
-    service = paginator.get_page()[0]
+    service_page = paginator.get_page()
+    service = service_page[0]
 
     image = InputMediaPhoto(
         media=service.image,
         caption=f"\nОписание: {service.description}\nСтоимость: {round(service.price, 2)} rub\n"
         f"Аккаунт {paginator.page} из {paginator.pages}",
     )
-
-    kbds = get_services_btns3(
+    pagination_btns = pages(paginator)
+    kbds = get_services_btns(
         level=level,
-        service_id=service.id,
+        page=page,
+        pagination_btns=pagination_btns,
+        service_id = service.id
     )
 
     return image, kbds
+
 
 
 async def get_menu_content(
@@ -151,10 +164,9 @@ async def get_menu_content(
         return await categ(session)
 
     elif level == 2:
-        return await gamecatalog(session, game_cat, level, page)
+        return await gamecatalog(session, game_cat, level)
 
     elif level == 3:
         return await viewgame(session, level, page, game_cat)
-
     # Возвращаем значения по умолчанию
     return None

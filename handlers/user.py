@@ -7,14 +7,14 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram import F
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
 from db.engine import AsyncSessionLocal
-from db.orm_query import orm_get_accounts_by_game
-from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
+from db.orm_query import orm_get_accounts_by_game1
+from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate, get_services_btns4
 from db.models import Accounts
 from aiogram.fsm.state import StatesGroup
 from aiogram.fsm.context import FSMContext
-from handlers.menu_proccesing import gamecatalog, get_menu_content, handle_game_selection, viewgame
+from handlers.menu_proccesing import gamecatalog, get_menu_content, handle_game_selection
 
 user_router = Router()
 
@@ -77,15 +77,14 @@ async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, 
 @user_router.callback_query(lambda c: c.data.startswith('show_cat_'))
 async def process_show_game(callback_query: types.CallbackQuery):
     level = 2
-    page = 1  # Начальная страниц
     # Извлекаем категорию из колбек-данных
     game_cat = callback_query.data.split('_')[2]  # Получаем название категории
     async with AsyncSessionLocal as session:
         # Получаем контент меню для уровня 2 (каталог игр)
-        message_text, kbds = await gamecatalog(session, game_cat, level, page)
+        message_text, kbds = await gamecatalog(session, game_cat, level)
 
         # Отправляем сообщение пользователю
-        await callback_query.message.answer(message_text, reply_markup=kbds)
+        await callback_query.message.edit_media(message_text, reply_markup=kbds)
         await callback_query.answer()
 
 
@@ -100,10 +99,36 @@ async def process_game_selection(callback_query: types.CallbackQuery):
         await handle_game_selection(callback_query, session, game_name,  level, page)
 
 
+@user_router.message(F.text.lower().contains('й'))
+async def yow(msg: types.Message):
+    await msg.answer('ЙОООООООООООООООООООООООу')
 
 
+@user_router.message(F.text)
+async def gamesearch(message: types.Message, session: AsyncSession):  
+    level = 3
+    game = message.text.strip()  # Убираем лишние пробелы
+    account_qwe = await orm_get_accounts_by_game1(session, game)
+    
+    print(account_qwe)  # Отладочное сообщение
 
+    p = 0
+    for service in account_qwe:  # Проходим по всем найденным услугам
+        p+=1
+        account_info = (
+            f"{service.description}\n"  # Используем service вместо account_qwe
+            f"Игра: {service.gamesonaacaunt}\n"  # Используем service
+            f"Цена: {service.price} rub"
+        )
 
+        kbds = get_services_btns4(
+            level=level,
+            service_id=service.id  # Используем service вместо services
+        )
+    if p>0:
+        await message.answer_photo(photo=service.image,caption=account_info, reply_markup=kbds)
+    else:
+        await message.answer('Напиши старт')
 
 ##################Список всех аккаунтов в будующем только кнопки################################################################
 @user_router.message(F.text.lower().contains('аккаунты'))
@@ -121,16 +146,15 @@ async def view_all_accounts(message_or_query: types.Message | types.CallbackQuer
 
     if account_list:
         for account in account_list:
-            desc_name = account.name if account.name else "Без названия"
             description = account.description if account.description else "Нет описания"
             account_info = (
-                f"Аккаунт: {desc_name}\n"
+                f"Аккаунт: {description}\n"
                 f"Игры: {account.gamesonaacaunt}\n"
                 f"Цена: {account.price}"
             )
 
             # Создаем инлайн-кнопку для каждого аккаунта
-            inline_button = InlineKeyboardButton(text=f"Подробнее о {desc_name}", callback_data=f"details_{desc_name}_{description}")
+            inline_button = InlineKeyboardButton(text=f"Подробнее о {description}", callback_data=f"details_{description}_{description}")
             keyboard = InlineKeyboardMarkup(inline_keyboard=[[inline_button]])
 
             # Отправляем информацию об аккаунте с кнопкой "Подробнее" и изображением
@@ -363,12 +387,5 @@ async def get_last_steam_email(cb: types.CallbackQuery, session: AsyncSession):
 
 
 ##################обработчик сообщений вне команд################################################################
-@user_router.message(F.text.lower().contains('йо'))
-async def yow(msg: types.Message):
-    await msg.answer('ЙОООООООООООООООООООООООу')
 
-@user_router.message()
-async def messagevnecommand(message: types.Message):
-    await message.answer(
-    'Мужик напиши старт'
-    )
+
