@@ -86,13 +86,13 @@ async def gamecatalog(session: AsyncSession, game_cat: str, level):
     games = await orm_get_accounts_by_game(session, game_cat)
     # Формируем список игр для отображения
     games_list = "\n".join(
-        [f"{game.gamesonaacaunt}" for game in games]
-        )  
+        [f"`{game.gamesonaacaunt}`" for game in games]  # Используем * для жирного шрифта
+    )  
     if banner:
         image = InputMediaPhoto(
             media=banner.image,
-            caption=f"Игры:\n{games_list}\nВведи игру формате gamename_название игры ",
-        )
+            caption=f"Игры:\n{games_list}",
+            parse_mode='MarkdownV2')
     else:
         image = None
     kbds = get_services_btns3(
