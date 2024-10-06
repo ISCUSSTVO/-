@@ -1,13 +1,9 @@
-#import asyncio
-#import re
-#import email
-#import imaplib
 from aiogram import types, Router
 from aiogram.filters import CommandStart
 from aiogram import F
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.orm_query import orm_get_accounts_by_game1
-from inlinekeyboars.inline_kbcreate import Menucallback, get_services_btns4
+from inlinekeyboars.inline_kbcreate import Menucallback, buying_kbds
 from aiogram.fsm.state import StatesGroup
 from handlers.menu_proccesing import game_catalog, get_menu_content
 
@@ -15,8 +11,6 @@ user_router = Router()
 
 
 account_list = [] 
-IMAP_SERVER = "imap.mail.ru"
-SMTP_SERVER = "smtp.mail.ru"
 
 
 class Form(StatesGroup):
@@ -54,9 +48,6 @@ async def process_show_game(callback_query: types.CallbackQuery, session: AsyncS
     await callback_query.message.edit_media(message_text, reply_markup=kbds)
     await callback_query.answer()
 
-@user_router.message(F.text.lower().contains('й'))
-async def yow(msg: types.Message):
-    await msg.answer('ЙОООООООООООООООООООООООу')
 
 
 @user_router.message()
@@ -76,8 +67,7 @@ async def game_search(message: types.Message, session: AsyncSession):
             f"Цена: {service.price} rub"
         )
 
-        kbds = get_services_btns4(
-            level=3,
+        kbds = buying_kbds(
             service_id=service.id  # Используем service вместо services
         )
         await message.answer_photo(photo=service.image,caption=account_info, reply_markup=kbds)

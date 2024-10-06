@@ -7,6 +7,9 @@ class Menucallback(CallbackData, prefix ="menu"):
     menu_name: str
     page: int = 1
 
+class BUYcallback(CallbackData, prefix = 'cart'):
+    menu_name: str
+
 
 ##################Создание инлайн клавиатуры  ################################################################
 def inkbcreate(
@@ -131,6 +134,21 @@ def get_services_btns4(
 
     keyboard.add(InlineKeyboardButton(text='Купить 💵',
                 callback_data=Menucallback(level=level, menu_name='add_to_cart', service_id=service_id).pack()))
+
+    keyboard.adjust(*sizes)
+
+
+    return keyboard.as_markup()
+
+def buying_kbds(
+    *,
+    service_id: int,
+    sizes: tuple[int] = (2, 1)
+):
+    keyboard = InlineKeyboardBuilder()
+
+    keyboard.add(InlineKeyboardButton(text='Купить 💵',
+                callback_data=BUYcallback(menu_name='add_to_cart', service_id=service_id).pack()))
 
     keyboard.adjust(*sizes)
 

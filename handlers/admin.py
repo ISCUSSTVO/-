@@ -233,14 +233,14 @@ async def backstep(msg: types.Message,state: FSMContext):
         prev = step
 ##################Добавление аккаунта################################################################
 @adm_router.callback_query(StateFilter(None), F.data == ('Plus_acc'))
-async def addadmin1(callback: types.CallbackQuery, state: FSMContext):
+async def add_account(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.reply(
         text='Введи описание'
     )
     await state.set_state(addaccount.desc)
 
 @adm_router.message(addaccount.desc)
-async def addgame_desc(message: types.Message, state: FSMContext):
+async def add_game_desc(message: types.Message, state: FSMContext):
     await state.update_data(accdesc=message.text)
     await message.reply(
         'Введи игры на аккаунте'
@@ -248,7 +248,7 @@ async def addgame_desc(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.game)
 
 @adm_router.message(addaccount.game)
-async def addgame_game(message: types.Message, state: FSMContext):
+async def add_game_game(message: types.Message, state: FSMContext):
     await state.update_data(accgame=message.text)
     await message.reply(
         'Введи цену аккаунта'
@@ -256,7 +256,7 @@ async def addgame_game(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.priceacc)
 
 @adm_router.message(addaccount.priceacc)
-async def addpriceacc(message: types.Message, state: FSMContext):
+async def add_priceacc(message: types.Message, state: FSMContext):
     await state.update_data(priceacc=message.text)
     await message.reply(
         'Введи категории игр на аккаунте'
@@ -264,7 +264,7 @@ async def addpriceacc(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.categories)
 
 @adm_router.message(addaccount.categories)
-async def addcategories(message: types.Message, state: FSMContext):
+async def add_categories(message: types.Message, state: FSMContext):
     await state.update_data(acccat=message.text)
     await message.reply(
         'Теперь картинку заглавной игры аккаунта'
@@ -272,7 +272,7 @@ async def addcategories(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.accim)
 
 @adm_router.message(addaccount.accim)
-async def addimage(message: types.Message, state: FSMContext):
+async def add_image(message: types.Message, state: FSMContext):
     if message.photo:
         await state.update_data(acccim=message.photo[0].file_id)
     await message.reply(
@@ -281,7 +281,7 @@ async def addimage(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.acclogin)
 
 @adm_router.message(addaccount.acclogin)
-async def addlogin(message: types.Message, state: FSMContext):
+async def add_login(message: types.Message, state: FSMContext):
     await state.update_data(accnewlogin=message.text)
     await message.reply(
         'Теперь пароль'
@@ -289,7 +289,7 @@ async def addlogin(message: types.Message, state: FSMContext):
     await state.set_state(addaccount.accpasword)
 
 @adm_router.message(addaccount.accpasword)
-async def addpassword(message: types.Message,state: FSMContext):
+async def add_password(message: types.Message,state: FSMContext):
     await state.update_data(accnewpassword=message.text)
     await message.reply(
         'Теперь почту'
@@ -297,7 +297,7 @@ async def addpassword(message: types.Message,state: FSMContext):
     await state.set_state(addaccount.accmail)
 
 @adm_router.message(addaccount.accmail)
-async def addmail(message: types.Message,state: FSMContext):
+async def add_mail(message: types.Message,state: FSMContext):
     await state.update_data(accmail=message.text)
     await message.reply(
         'Теперь пароль от почты'
@@ -305,7 +305,7 @@ async def addmail(message: types.Message,state: FSMContext):
     await state.set_state(addaccount.imap)
 
 @adm_router.message(addaccount.imap)
-async def addimap(message: types.Message, session: AsyncSession, state: FSMContext):
+async def add_imap(message: types.Message, session: AsyncSession, state: FSMContext):
     await state.update_data(accimap=message.text)
     data = await state.get_data()
     # Создаем новый объект аккаунта
@@ -340,7 +340,7 @@ async def addimap(message: types.Message, session: AsyncSession, state: FSMConte
     )
 ###АККАУНТЫ ДЛЯ ИЗМЕНЕНИЯ\УДАЛЕНИЯ###
 @adm_router.callback_query(F.data == 'showall')
-async def showallaccounts(cb: types.CallbackQuery, session: AsyncSession):
+async def show_all_accounts(cb: types.CallbackQuery, session: AsyncSession):
     result = await session.execute(select(Accounts))
     account_list = result.scalars().all()
 
@@ -470,14 +470,14 @@ async def update_account_field(message: types.Message, state: FSMContext, field_
         await session.execute(
             update(Accounts).where(Accounts.description == account_name).values({field_name: new_value})
         )
-    await session.commit()
+        await session.commit()
 
     
     await message.answer(f"{field_name.replace('_', ' ').capitalize()} аккаунта обновлено на: {new_value}")
     await state.clear()
 ##################Удаление аккаунта ################################################################
 @adm_router.callback_query(F.data.startswith('delacc_'))
-async def dellgacc(cb: types.CallbackQuery, session: AsyncSession):
+async def delete_acc(cb: types.CallbackQuery, session: AsyncSession):
     desc_name = cb.data.split('_')[1]
     await session.execute(
     delete(Accounts).where(Accounts.description ==desc_name)
@@ -489,7 +489,7 @@ async def dellgacc(cb: types.CallbackQuery, session: AsyncSession):
 
 ##################УДАЛЕНИЕ АДМИНА################################################################
 @adm_router.callback_query(F.data == 'deladm')
-async def delladm(callback: types.CallbackQuery, session: AsyncSession):
+async def delete_adm(callback: types.CallbackQuery, session: AsyncSession):
     result = await session.execute(select(Admlist))
     admins = result.scalars().all()
     
