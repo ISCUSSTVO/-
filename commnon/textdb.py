@@ -10,6 +10,5 @@ description_for_info_pages = {
         "При получении карта/кеш",
         "В заведении",
         marker="✅ ",
-    ).as_html(),
-
+    ).as_markdown(),
 }

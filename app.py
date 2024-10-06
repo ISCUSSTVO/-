@@ -1,6 +1,7 @@
 import asyncio
 import os
 from aiogram import Bot, Dispatcher
+from aiogram.enums import ParseMode
 from db.engine import create_db, drop_db, session_maker
 
 
@@ -15,7 +16,7 @@ from handlers.admin import adm_router
 from handlers.user import user_router
 
 
-bot = Bot(token=os.getenv('TOKEN'), )
+bot = Bot(token=os.getenv('TOKEN'), parse_mode=ParseMode.HTML)
 dp = Dispatcher()
 
 dp.include_routers(adm_router, user_router)

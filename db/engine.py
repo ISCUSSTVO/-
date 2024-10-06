@@ -2,7 +2,7 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from db.models import Base
-from db.textdb import description_for_info_pages
+from commnon.textdb import description_for_info_pages
 from db.orm_query import orm_add_banner_description
 ##################создание базы данных ################################################################
 engine = create_async_engine(os.getenv('DB_LITE'), echo = True)

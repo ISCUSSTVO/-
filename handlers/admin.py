@@ -8,13 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import Admlist, Accounts
 from db.orm_query import orm_get_info_pages, orm_change_banner_image
 from inlinekeyboars.inline_kbcreate import inkbcreate
-import logging
 from db.engine import AsyncSessionLocal
 
-
-logging.basicConfig(level=logging.INFO)
-
- 
 
 
 
@@ -57,7 +52,7 @@ class addaccount(StatesGroup):
 adminlist = ['civqw']
 ####################################АВТОДОБАВЛЕНИЕ АДМИНА ИЗ ЛИСТА ADMINLIST####################################
 @adm_router.message(Command('eta'))
-async def evrytimeadm(message: types.Message, session: AsyncSession):
+async def Evry_Time_Adm(message: types.Message, session: AsyncSession):
     # Проверяем, является ли пользователь администратором
     if message.from_user.username in adminlist:
         # Проходим по каждому администратору из admin_list23
@@ -72,25 +67,33 @@ async def evrytimeadm(message: types.Message, session: AsyncSession):
             session.add(new_admin)
             await session.commit()
             await message.answer(
-                'да брат ты опять админ'
+                'Ты теперь админ'
             )
         else:
             await message.answer(
-                'ты всегда админ брат'
+                'Ты и так админ '
         )
     else:
         await message.reply(
             'ты не админ'
         )
 ####################################АДМ МЕНЮ КОЛЛБЕК####################################
-@adm_router.message(Command('ad'))
+
 @adm_router.callback_query(F.data==('admin'))
-async def chek_adm1(cb_or_msg: types.CallbackQuery | types.Message, session: AsyncSession):
-    if isinstance(cb_or_msg, types.CallbackQuery):
-        await cb_or_msg.answer()
-        message = cb_or_msg.message
-    else:
-        message = cb_or_msg
+async def admin_commands_cb(callback: types.CallbackQuery):
+    await callback.message.answer(
+        'Здарова броууууу', reply_markup=inkbcreate(btns={
+            'Власть над админами': 'admcomm',
+            'Власть над аккаунтами': 'acccomm',
+            'Добавить изменить банер':  'banner'
+        })
+    )
+
+    await callback.message.delete()
+
+####################################АДМ МЕНЮ МСГ####################################
+@adm_router.message(Command('ad'))
+async def admin_commands_msg(message: types.Message, session: AsyncSession):
     result = await session.execute(select(Admlist))
     admin_list = result.scalars().all()
     admin_usernames = [admin.usernameadm for admin in admin_list]
@@ -100,56 +103,40 @@ async def chek_adm1(cb_or_msg: types.CallbackQuery | types.Message, session: Asy
                 'Власть над админами': 'admcomm',
                 'Власть над аккаунтами': 'acccomm',
                 'Добавить изменить банер':  'banner'
-            })
-        )
+                }))
+        await message.delete()
     else:
         await message.answer(
             'ты не админ'
         )
         await message.delete()
 
-####################################АДМ МЕНЮ МСГ####################################
-#@adm_router.message(Command('ad'))
-#async def chek_adm(message: types.Message, session: AsyncSession):
-#   result = await session.execute(select(Admlist))
-#   admin_list = result.scalars().all()
-#   admin_usernames = [admin.usernameadm for admin in admin_list]
-#   if message.from_user.username in admin_usernames:
-#       await message.answer(
-#           'Здарова броууууу', reply_markup=inkbcreate(btns={
-#               'Власть над админами': 'admcomm',
-#               'Власть над аккаунтами': 'acccomm'
-#           })
-#       )
-#   else:
-#       await message.answer(
-#           'ты не админ'
-#       )
-#       await message.delete()
 ###################################АДМ МЕНЮ####################################
 @adm_router.callback_query(F.data == ('admcomm'))
-async def commadm(cb: types.CallbackQuery,):
+async def comm_adm(cb: types.CallbackQuery,):
     await cb.message.answer(
         'Что хочешь??',reply_markup=inkbcreate(btns={
             'Добавить админа': 'Plus_adm',
             'Удалить админа': 'deladm',
-            'Админ лист':   'chekadm'
-        })
+            'Назад':    'admin'
+        }, sizes=(3,))
     )
 ####################################МЕНЮ АККАУНТОВ####################################
 @adm_router.callback_query(F.data == ('acccomm'))
-async def accadm(cb: types.CallbackQuery,):
+async def acc_adm(cb: types.CallbackQuery,):
     await cb.message.answer(
         'Что хочешь?',reply_markup=inkbcreate(btns={
+        
             'Дабавить аккаунт': 'Plus_acc',
-            'Изменить аккаунты': 'showall'
-        })
+            'Изменить аккаунты': 'showall',
+            'Назад':    'admin'
+        },sizes=(2,))
         )
 
 ####################################ДОБАВЛЕНИЕ АДМИНА####################################
 @adm_router.callback_query(F.data == ('Plus_adm'))
-async def addadm(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer('ВВеди юз ')
+async def add_adm(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer('Введи телеграм юз ')
     await state.set_state(addadminglobal.plusadm)  # Установите состояние правильно
 
 @adm_router.message(addadminglobal.plusadm)
@@ -216,7 +203,7 @@ async def add_banner(message: types.Message, state: FSMContext, session: AsyncSe
     for_page = message.caption.strip()
     pages_names = [page.name for page in await orm_get_info_pages(session)]
     if for_page not in pages_names:
-        await message.answer(f"Введите нормальное название страницы, например:\
+        await message.answer(f"Введите коректное название страницы, например:\
                          \n{', '.join(pages_names)}")
         return
     await orm_change_banner_image(session, for_page, image_id,)
@@ -226,7 +213,7 @@ async def add_banner(message: types.Message, state: FSMContext, session: AsyncSe
 # ловим некоррекный ввод
 @adm_router.message(AddBanner.image)
 async def add_banner2(message: types.Message):
-    await message.answer("Отправьте фото баннера или отмена")
+    await message.answer("Отправьте фото баннера или напишите отмена")
 ##################Назад к прошлому стейту################################################################ 
 @adm_router.message(F.text.casefold()==('назад'))
 async def backstep(msg: types.Message,state: FSMContext):
@@ -247,7 +234,7 @@ async def backstep(msg: types.Message,state: FSMContext):
 ##################Добавление аккаунта################################################################
 @adm_router.callback_query(StateFilter(None), F.data == ('Plus_acc'))
 async def addadmin1(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(
+    await callback.message.reply(
         text='Введи описание'
     )
     await state.set_state(addaccount.desc)
@@ -391,7 +378,7 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
     account = result.scalar_one_or_none()
 
     await cb.message.answer(
-        f"Вы выбрали аккаунт: {account.name}\n"
+        f"Вы выбрали аккаунт: {account.description}\n"
         f"Игры: {account.gamesonaacaunt}\n"
         f"Цена: {account.price}\n\n"
         "Что вы хотите изменить?",
@@ -399,6 +386,7 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
             "Изменить игры": f"change_games_{account_name}",
             "Изменить цену": f"change_price_{account_name}",
             "Изменить описание": f"change_description_{account_name}",
+            "Изменить категории": f"change_categories_{account_name}",
             "Изменить логин": f"change_login_{account_name}",
             "Изменить пароль": f"change_password_{account_name}",
             "Изменить почту": f"change_email_{account_name}",
@@ -408,7 +396,7 @@ async def chngacc(cb: types.CallbackQuery, session: AsyncSession):
         })
     )
     
-    await cb.answer()  # Убираем уведомление о нажатой кнопке
+    await cb.answer()
 
 
 ###СМЕНА ИНФОРМАЦИИ ОБ АКАУНТЕ КОНКРЕТНО ПО ПУНКТАМ###
@@ -423,6 +411,7 @@ async def process_change_selection(cb: types.CallbackQuery, state: FSMContext):
         'games': "Введите новые игры:",
         'price': "Введите новую цену:",
         'description': "Введите новое описание:",
+        'categories': "Введите новые категории",
         'login': "Введите новый логин:",
         'password': "Введите новый пароль:",
         'email': "Введите новую почту:",
@@ -446,6 +435,10 @@ async def update_price(message: types.Message, state: FSMContext):
 @adm_router.message(StateFilter("new_description"))
 async def update_description(message: types.Message, state: FSMContext):
     await update_account_field(message, state, 'description')
+
+@adm_router.message(StateFilter("new_categories"))
+async def update_categories(message: types.Message, state: FSMContext):
+    await update_account_field(message, state, 'categories')
 
 @adm_router.message(StateFilter("new_login"))
 async def update_login(message: types.Message, state: FSMContext):
@@ -475,7 +468,7 @@ async def update_account_field(message: types.Message, state: FSMContext, field_
     
     async with AsyncSessionLocal as session:  # Используйте AsyncSessionLocal
         await session.execute(
-            update(Accounts).where(Accounts.name == account_name).values({field_name: new_value})
+            update(Accounts).where(Accounts.description == account_name).values({field_name: new_value})
         )
     await session.commit()
 
@@ -493,23 +486,6 @@ async def dellgacc(cb: types.CallbackQuery, session: AsyncSession):
     await cb.message.answer(f'Аккаунт {desc_name} удалён.')
     await cb.message.delete()
 
-##################Список админов################################################################
-@adm_router.callback_query(F.data ==('chekadm'))
-async def chekadm(cb: types.CallbackQuery, session: AsyncSession):
-    result = await session.execute(select(Admlist))
-    admins = result.scalars().all()
-    admin_usernames = [admin.usernameadm for admin in admins]
-    if admins:
-        admin_usernames = [admin.usernameadm for admin in admins]
-        admin_list = "\n".join(admin_usernames)
-
-        await cb.message.answer(
-        f'Список администраторов:\n{admin_list}'
-        )
-    else:
-        await cb.message.answer(
-        'В базе данных нет администраторов.'
-    )
 
 ##################УДАЛЕНИЕ АДМИНА################################################################
 @adm_router.callback_query(F.data == 'deladm')
