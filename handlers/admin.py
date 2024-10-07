@@ -49,7 +49,7 @@ class addaccount(StatesGroup):
 
 
 
-adminlist = ['civqw']
+adminlist = ['weetrix']
 ####################################АВТОДОБАВЛЕНИЕ АДМИНА ИЗ ЛИСТА ADMINLIST####################################
 @adm_router.message(Command('eta'))
 async def Evry_Time_Adm(message: types.Message, session: AsyncSession):
@@ -82,7 +82,7 @@ async def Evry_Time_Adm(message: types.Message, session: AsyncSession):
 @adm_router.callback_query(F.data==('admin'))
 async def admin_commands_cb(callback: types.CallbackQuery):
     await callback.message.answer(
-        'Здарова броууууу', reply_markup=inkbcreate(btns={
+        'Разделяй и властвуй', reply_markup=inkbcreate(btns={
             'Власть над админами': 'admcomm',
             'Власть над аккаунтами': 'acccomm',
             'Добавить изменить банер':  'banner'
@@ -99,7 +99,7 @@ async def admin_commands_msg(message: types.Message, session: AsyncSession):
     admin_usernames = [admin.usernameadm for admin in admin_list]
     if message.from_user.username in admin_usernames:
         await message.answer(
-            'Здарова броууууу', reply_markup=inkbcreate(btns={
+            'Разделяй и властвуй', reply_markup=inkbcreate(btns={
                 'Власть над админами': 'admcomm',
                 'Власть над аккаунтами': 'acccomm',
                 'Добавить изменить банер':  'banner'
@@ -189,7 +189,7 @@ class AddBanner(StatesGroup):
 
 # Отправляем перечень информационных страниц бота и становимся в состояние отправки photo
 @adm_router.callback_query(StateFilter(None), F.data == ('banner'))
-async def add_image2(cb: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+async def add_banner(cb: types.CallbackQuery, state: FSMContext, session: AsyncSession):
     pages_names = [page.name for page in await orm_get_info_pages(session)]
     await cb.message.answer(f"Отправьте фото баннера.\nВ описании укажите для какой страницы:\
                          \n{', '.join(pages_names)}")
@@ -198,7 +198,7 @@ async def add_image2(cb: types.CallbackQuery, state: FSMContext, session: AsyncS
 # Добавляем/изменяем изображение в таблице (там уже есть записанные страницы по именам:
 # main, catalog, cart(для пустой корзины), about, payment, shipping
 @adm_router.message(AddBanner.image, F.photo)
-async def add_banner(message: types.Message, state: FSMContext, session: AsyncSession):
+async def add_banner1(message: types.Message, state: FSMContext, session: AsyncSession):
     image_id = message.photo[-1].file_id
     for_page = message.caption.strip()
     pages_names = [page.name for page in await orm_get_info_pages(session)]

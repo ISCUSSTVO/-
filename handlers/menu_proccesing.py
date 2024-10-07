@@ -1,7 +1,7 @@
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.orm_query import orm_get_accounts_by_game, orm_get_banner, orm_check_catalog
-from inlinekeyboars.inline_kbcreate import get_services_btns3, get_user_main_btns
+from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns
 
 
 
@@ -75,7 +75,7 @@ async def game_catalog(session: AsyncSession, game_cat: str, level):
     else:
         image = None
     
-    kbds = get_services_btns3(
+    kbds = back_kbds(
         level=level,
     )
 
