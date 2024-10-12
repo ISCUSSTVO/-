@@ -2,7 +2,7 @@ from aiogram import types, Router
 from aiogram.filters import CommandStart
 from aiogram import F
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.orm_query import orm_get_accounts_by_game1
+from db.orm_query import orm_get_accounts_by_game
 from inlinekeyboars.inline_kbcreate import Menucallback, buying_kbds
 from aiogram.fsm.state import StatesGroup
 from handlers.menu_proccesing import game_catalog, get_menu_content
@@ -53,7 +53,7 @@ async def process_show_game(callback_query: types.CallbackQuery, session: AsyncS
 @user_router.message()
 async def game_search(message: types.Message, session: AsyncSession):  
     game = message.text
-    account_qwe = await orm_get_accounts_by_game1(session, game)
+    account_qwe = await orm_get_accounts_by_game(session, game)
     games_list = [account.gamesonaacaunt for account in account_qwe]
     if game not in games_list or not F.text:
         await message.answer('Напиши старт')

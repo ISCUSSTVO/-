@@ -1,11 +1,11 @@
 import asyncio
 import os
 from aiogram import Bot, Dispatcher
+from dotenv import find_dotenv, load_dotenv
 from db.engine import create_db, drop_db, session_maker
 
 
 
-from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv())
 
 from midleware.db import DataBaseSession

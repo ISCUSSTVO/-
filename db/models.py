@@ -6,7 +6,7 @@ class Base(DeclarativeBase):
     updated: Mapped[DateTime] = mapped_column(DateTime, default = func.now() , onupdate= func.now())
 
 ##################Дтаблица админов################################################################
-class Admlist(Base):
+class Admins(Base):
     __tablename__ = 'admins'
 
     id: Mapped[int] = mapped_column(primary_key = True, autoincrement = True)

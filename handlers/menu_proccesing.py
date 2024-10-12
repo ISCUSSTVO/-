@@ -1,6 +1,6 @@
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.orm_query import orm_get_accounts_by_game, orm_get_banner, orm_check_catalog
+from db.orm_query import orm_get_category, orm_get_banner, orm_check_catalog
 from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns
 
 
@@ -60,7 +60,7 @@ async def categ(session):
 async def game_catalog(session: AsyncSession, game_cat: str, level):
     banner = await orm_get_banner(session, "catalog")
     # Получаем игры по категории из базы данных
-    games = await orm_get_accounts_by_game(session, game_cat)
+    games = await orm_get_category(session, game_cat)
     # Формируем список игр для отображения
     games_list = "\n".join(
         [f"`{game.gamesonaacaunt}`" for game in games]
