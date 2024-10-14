@@ -34,16 +34,6 @@ async def orm_get_info_pages(session: AsyncSession):
 
 
 ############### Работа с каталогами###############
-async def orm_add_catalog(session: AsyncSession, data: dict):
-    obj = Accounts()(
-        name=data["name"],
-        description=data["description"],
-        price=float(data["price"]),
-        image=data["image"],
-    )
-    session.add(obj)
-    await session.commit()
-
 async def orm_check_catalog(session: AsyncSession):
     query = select(Accounts)
     result = await session.execute(query)

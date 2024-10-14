@@ -1,7 +1,8 @@
+from aiogram import types
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.orm_query import orm_get_category, orm_get_banner, orm_check_catalog
-from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns
+from db.orm_query import orm_get_accounts_by_game, orm_get_category, orm_get_banner, orm_check_catalog
+from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns, inkbcreate
 
 
 
@@ -21,13 +22,11 @@ async def categ(session):
     # Получаем все аккаунты
     accounts = await orm_check_catalog(session)
 
-    # Формируем сообщение с аккаунтами
-    accounts_list = "\n".join([f"{account.categories}" for account in accounts])
 
     if banner:
         image = InputMediaPhoto(
             media=banner.image,
-            caption=f"Категории:\n{accounts_list}",
+            caption="Категории:\n",
         )
     else:
         image = None
@@ -69,7 +68,7 @@ async def game_catalog(session: AsyncSession, game_cat: str, level):
     if banner:
         image = InputMediaPhoto(
             media=banner.image,
-            caption=f"Игры:\n{games_list}",
+            caption=f"Игры:\n{games_list}\nНажмите на название игры и вставьте в чат ",
             parse_mode='MarkdownV2'
         )
     else:
@@ -80,6 +79,48 @@ async def game_catalog(session: AsyncSession, game_cat: str, level):
     )
 
     return image, kbds
+
+async def game_searching(session: AsyncSession, game: str):
+    account_qwe = await orm_get_accounts_by_game(session, game)
+    banner = await orm_get_banner(session, "catalog")
+    image = None
+    for account in account_qwe:  # Проходим по всем найденным услугам
+        account_info = (
+            "тут будет логика оплаты"
+        )
+        if banner:
+            image = InputMediaPhoto(
+                media=banner.image,
+                caption=account_info
+            )
+        kbds = inkbcreate(btns={
+            "Я оплатил":    f'oplatil_{account.gamesonaacaunt}'
+        })
+
+        return image, kbds
+    
+async def vidachalogs(session: AsyncSession, game:str):
+    account_qwe = await orm_get_accounts_by_game(session, game)
+    banner = await orm_get_banner(session, "catalog")
+    image = None
+    for account in account_qwe:  # Проходим по всем найденным услугам
+        account_info = (
+            f"Логин:    {account.acclog}\nПороль:   {account.accpass}"
+        )
+        if banner:
+            image = InputMediaPhoto(
+                media=banner.image,
+                caption=account_info
+            )
+        kbds = inkbcreate(btns={
+            "Проверить почту":    f'chek_mail_{account.gamesonaacaunt}'
+        })
+
+        return image, kbds
+
+
+
+
 
 
 
@@ -97,3 +138,6 @@ async def get_menu_content(
 
     elif level == 2:
         return await game_catalog(session, game_cat, level)
+    
+   #elif level == 3:
+   #    return await carts(session)

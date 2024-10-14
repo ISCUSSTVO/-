@@ -80,6 +80,7 @@ async def comm_adm(cb: types.CallbackQuery,):
             'Назад':    'admin'
         }, sizes=(3,))
     )
+    await cb.message.delete()
 ####################################МЕНЮ АККАУНТОВ####################################
 @adm_router.callback_query(F.data == ('acccomm'))
 async def acc_adm(cb: types.CallbackQuery,):
@@ -91,7 +92,7 @@ async def acc_adm(cb: types.CallbackQuery,):
             'Назад':    'admin'
         },sizes=(2,))
         )
-
+    await cb.message.delete()
 ####################################ДОБАВЛЕНИЕ АДМИНА####################################
 class PlusAdmin(StatesGroup):
     plusadm = State()
@@ -100,7 +101,8 @@ user_data = {}
 @adm_router.callback_query(F.data == ('Plus_adm'))
 async def add_adm(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer('Введи телеграм юз ')
-    await state.set_state(PlusAdmin.plusadm)  
+    await state.set_state(PlusAdmin.plusadm)
+    await callback.message.delete() 
 
 @adm_router.message(PlusAdmin.plusadm)
 async def handle_username_to_add(msg: types.Message, session: AsyncSession, state: FSMContext):
@@ -120,6 +122,7 @@ async def handle_username_to_add(msg: types.Message, session: AsyncSession, stat
             'Админ меню': 'admcomm'
             }))
         await state.clear()
+        await msg.delete()
 
     else:
         await msg.answer(f' @{new_username} и так админ',reply_markup=inkbcreate(btns={
@@ -127,7 +130,7 @@ async def handle_username_to_add(msg: types.Message, session: AsyncSession, stat
         'Админ меню': 'admcomm' 
         }))
         await state.clear()
-
+        await msg.delete()
 ################# Микро FSM для загрузки/изменения баннеров ############################
 
 class AddBanner(StatesGroup):
@@ -189,10 +192,11 @@ class PlussAccount(StatesGroup):
 
 @adm_router.callback_query(F.data == ('Plus_acc'))
 async def add_account(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.reply(
+    await callback.message.answer(
         text='Введи описание'
     )
     await state.set_state(PlussAccount.desc)
+    await callback.message.delete()
 
 @adm_router.message(PlussAccount.desc)
 async def add_game_desc(message: types.Message, state: FSMContext):
@@ -201,6 +205,7 @@ async def add_game_desc(message: types.Message, state: FSMContext):
         'Введи игры на аккаунте'
     )
     await state.set_state(PlussAccount.game)
+    await message.delete()
 
 @adm_router.message(PlussAccount.game)
 async def add_game_game(message: types.Message, state: FSMContext):
@@ -209,6 +214,7 @@ async def add_game_game(message: types.Message, state: FSMContext):
         'Введи цену аккаунта'
     )
     await state.set_state(PlussAccount.priceacc)
+    await message.delete()
 
 @adm_router.message(PlussAccount.priceacc)
 async def add_priceacc(message: types.Message, state: FSMContext):
@@ -217,6 +223,7 @@ async def add_priceacc(message: types.Message, state: FSMContext):
         'Введи категории игр на аккаунте'
     )
     await state.set_state(PlussAccount.categories)
+    await message.delete()
 
 @adm_router.message(PlussAccount.categories)
 async def add_categories(message: types.Message, state: FSMContext):
@@ -225,6 +232,7 @@ async def add_categories(message: types.Message, state: FSMContext):
         'Теперь картинку заглавной игры аккаунта'
     )
     await state.set_state(PlussAccount.accim)
+    await message.delete()
 
 @adm_router.message(PlussAccount.accim)
 async def add_image(message: types.Message, state: FSMContext):
@@ -234,6 +242,7 @@ async def add_image(message: types.Message, state: FSMContext):
         'Теперь логин '
     )
     await state.set_state(PlussAccount.acclogin)
+    await message.delete()
 
 @adm_router.message(PlussAccount.acclogin)
 async def add_login(message: types.Message, state: FSMContext):
@@ -242,6 +251,7 @@ async def add_login(message: types.Message, state: FSMContext):
         'Теперь пароль от аккаунта'
     )
     await state.set_state(PlussAccount.accpasword)
+    await message.delete()
 
 @adm_router.message(PlussAccount.accpasword)
 async def add_password(message: types.Message,state: FSMContext):
@@ -250,6 +260,7 @@ async def add_password(message: types.Message,state: FSMContext):
         'Теперь почту'
     )
     await state.set_state(PlussAccount.accmail)
+    await message.delete()
 
 @adm_router.message(PlussAccount.accmail)
 async def add_mail(message: types.Message,state: FSMContext):
@@ -258,6 +269,7 @@ async def add_mail(message: types.Message,state: FSMContext):
         'Теперь пароль от почты'
     )
     await state.set_state(PlussAccount.imap)
+    await message.delete()  
 
 @adm_router.message(PlussAccount.imap)
 async def add_imap(message: types.Message, session: AsyncSession, state: FSMContext):
@@ -293,6 +305,7 @@ async def add_imap(message: types.Message, session: AsyncSession, state: FSMCont
             'Админ меню': 'admin'
         })
     )
+    await message.delete() 
 ###АККАУНТЫ ДЛЯ ИЗМЕНЕНИЯ\УДАЛЕНИЯ###
 @adm_router.callback_query(F.data == 'showall')
 async def show_all_accounts(cb: types.CallbackQuery, session: AsyncSession):

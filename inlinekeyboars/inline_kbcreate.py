@@ -8,6 +8,7 @@ class Menucallback(CallbackData, prefix ="menu"):
     page: int = 1
 
 class BUYcallback(CallbackData, prefix = 'cart'):
+    level:int
     menu_name: str
 
 
@@ -36,9 +37,6 @@ def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
     for text, menu_name  in btns.items():
         if menu_name == 'catalog':
             keyboard.add(InlineKeyboardButton(text=text, callback_data=Menucallback(level=1, menu_name=menu_name).pack()))   
-        elif menu_name == 'cart':
-            keyboard.add(InlineKeyboardButton(text=text,
-                                              callback_data =Menucallback(level=3, menu_name=menu_name).pack())) 
         else:
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data =Menucallback(level=level, menu_name=menu_name).pack()))   
@@ -64,13 +62,14 @@ def back_kbds(
 ############################################################Клавиатура покупки############################################################
 def buying_kbds(
     *,
+    level:int,
     service_id: int,
     sizes: tuple[int] = (2, 1)
 ):
     keyboard = InlineKeyboardBuilder()
 
     keyboard.add(InlineKeyboardButton(text='Купить 💵',
-                callback_data=BUYcallback(menu_name='add_to_cart', service_id=service_id).pack()))
+                callback_data=BUYcallback(level = level, menu_name='carts', service_id=service_id).pack()))
 
     keyboard.adjust(*sizes)
 
