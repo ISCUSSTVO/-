@@ -1,26 +1,21 @@
-import asyncio
-import email
-import imaplib
-import re
-from aiogram import types, Router
+from aiogram import types, Router, F
 from aiogram.filters import CommandStart
-from aiogram import F
+#from aiogram.types import InputMediaPhoto
+from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.orm_query import orm_get_accounts_by_game
+from db.orm_query import orm_check_catalog1, orm_get_accounts_by_game, orm_get_banner
 from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
-from aiogram.fsm.state import StatesGroup
-from handlers.menu_proccesing import game_catalog, game_searching, get_menu_content, vidachalogs
+from aiogram.fsm.state import State, StatesGroup
+from handlers.menu_proccesing import chek_mail, game_catalog, game_searching, get_menu_content, take_code, vidachalogs
 
 user_router = Router()
 
 
 account_list = [] 
 
-IMAP_SERVER = "imap.mail.ru"
-SMTP_SERVER = "smtp.mail.ru"
 
-class Form(StatesGroup):
-    waiting_for_game_name = 'waiting_for_game_name'
+
+
 
 @user_router.message(F.text.lower().contains('start'))
 @user_router.message(F.text.lower().contains('старт'))
@@ -45,14 +40,73 @@ async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, 
     await callback.answer()
 
 
-@user_router.callback_query(lambda c: c.data.startswith('show_cat_'))
+@user_router.callback_query(F.data.startswith('show_cat_'))
 async def process_show_game(callback_query: types.CallbackQuery, session: AsyncSession):
     # Извлекаем категорию из колбек-данных
     game_cat = callback_query.data.split('_')[2]  # Получаем название категории
-    message_text, kbds = await game_catalog(session, game_cat, level=2)
+    message_text, kbds = await game_catalog(session, game_cat, level=3)
     # Отправляем сообщение пользователю
     await callback_query.message.edit_media(message_text, reply_markup=kbds)
     await callback_query.answer()
+
+
+@user_router.callback_query(F.data.startswith('buyacc_'))
+async def buy_acc(callback:types.CallbackQuery, session:AsyncSession):
+    game = callback.data.split('_')[-1]
+    image, kbds = await game_searching(session, game)
+    await callback.message.edit_media(image, reply_markup=kbds)
+
+
+@user_router.callback_query(F.data.startswith('oplatil_'))
+async def oplata(callback: types.CallbackQuery, session:AsyncSession):
+    game = callback.data.split('_')[-1]
+    image, kbds = await vidachalogs(session, game)
+    await callback.message.edit_media(image, reply_markup=kbds)
+
+
+
+@user_router.callback_query(F.data.startswith('chek_mail_'))
+async def chek_mail1(callback: types.CallbackQuery, session: AsyncSession):
+    game = callback.data.split('_')[-1]
+
+    qwe, result = await chek_mail(session, game)
+    if result:
+        await callback.message.answer(result)
+    else:
+        await callback.message.answer(qwe)
+        
+############################Получение кода купленного аккаунта############################
+class GetCode(StatesGroup):
+    user_data = State()
+
+@user_router.callback_query(F.data == Menucallback(level=1, menu_name='steam_guard').pack())
+async def handle_steam_guard(callback_query: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+
+    image = await take_code(session, level=1)
+    await state.set_state(GetCode.user_data)
+    await callback_query.message.edit_media(media=image)
+   
+
+
+@user_router.message(GetCode.user_data)
+async def chek_code_guard(session: AsyncSession, message:types.Message, state: FSMContext):
+    await take_code(session,level=1)
+    qwe = await state.update_data(user_data=message.text)
+    result = await orm_check_catalog1(session, qwe)
+    if qwe == result:
+        await message.answer('динахуй')
+    else:
+        await message.answer("ебать ты крутой")
+
+
+    #qwe,image = await chek_mail(session, user_data)
+    #if image:
+    #    await message.edit_media(media=image)
+    #else:
+    #    await message.edit_text(qwe)
+#
+
+
 
 
 
@@ -75,78 +129,3 @@ async def game_search(message: types.Message, session: AsyncSession):
         })
         await message.answer_photo(account.image,caption=account_info, reply_markup=kbds)
         await message.delete()
-
-@user_router.callback_query(F.data.startswith('buyacc_'))
-async def buy_acc(callback:types.CallbackQuery, session:AsyncSession):
-    game = callback.data.split('_')[-1]
-    image, kbds = await game_searching(session, game)
-    await callback.message.edit_media(image, reply_markup=kbds)
-
-
-@user_router.callback_query(F.data.startswith('oplatil_'))
-async def oplata(callback: types.CallbackQuery, session:AsyncSession):
-    game = callback.data.split('_')[-1]
-    image, kbds = await vidachalogs(session, game)
-    await callback.message.edit_media(image, reply_markup=kbds)
-
-
-
-@user_router.callback_query(F.data.startswith('chek_mail_'))
-async def chek_mail(callback: types.CallbackQuery, session: AsyncSession):
-    game = callback.data.split('_')[-1]
-    
-    result = await orm_get_accounts_by_game(session, game)
-    for account in result:
-        user_data = (account.accmail, account.imap)
-        try:
-            loop = asyncio.get_event_loop()
-            # Создание цикла событий asyncio
-
-            if user_data is None:
-                await callback.message.answer("Не удалось получить данные из почтового ящика")
-                return
-            # Проверка наличия данных пользователя из почтового ящика
-
-            mail_connection = await loop.run_in_executor(
-                None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
-            )
-            # Установка защищенного соединения с почтовым сервером
-
-            mail_connection.login(user_data[0], user_data[1])
-            mail_connection.select("INBOX")
-            # Вход в почтовый ящик и выбор папки "INBOX"
-
-            status, data = mail_connection.search(None, "FROM", '"Steam"')
-            # Поиск писем от Steam
-
-            latest_email_id = data[0].split()[-1]
-            status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
-            # Извлечение последнего письма от Steam
-
-            raw_email = data[0][1]
-            email_message = email.message_from_bytes(raw_email)
-            # Извлечение содержимого письма
-
-            decoded_payload = None
-            if email_message.is_multipart():
-                for part in email_message.walk():
-                    if part.get_content_type() == "text/plain":
-                        decoded_payload = part.get_payload(decode=True).decode("utf-8")
-                        break
-            else:
-                decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
-            # Декодирование содержимого письма
-
-            if decoded_payload:
-                match = re.search(r'Россия(.*?)Если это были не вы', decoded_payload, re.DOTALL)
-                extracted_phrase = match.group(1).strip()
-                await callback.message.answer(f"{extracted_phrase}")
-            else:
-                await callback.message.answer("Не удалось декодировать содержимое письма")
-            # Извлечение кода доступа из письма и отправка его пользователю
-
-        except Exception as e:
-            await callback.message.answer(f"Произошла ошибка при чтении почты: {e}")
-        finally:
-            if "mail_connection" in locals():
-                mail_connection.logout()

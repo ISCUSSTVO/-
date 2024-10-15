@@ -38,6 +38,10 @@ async def orm_check_catalog(session: AsyncSession):
     query = select(Accounts)
     result = await session.execute(query)
     return result.scalars().all()
+async def orm_check_catalog1(session: AsyncSession, user_data):
+    query = select(Accounts).where(Accounts.accmail == user_data[0])
+    result = await session.execute(query)
+    return result.scalars().all()
 ############### Работа с админским хендлером###############
 async def orm_use_admin(session: AsyncSession):
     query = select(Admins)
@@ -57,7 +61,7 @@ async def orm_for_ETA(session: AsyncSession, username: str ):
 async def orm_change_account(session: AsyncSession, account_name:str):
     query = select(Accounts).where(Accounts.description == account_name)
     result = await session.execute(query)
-    return result.scalars().one_or_none()
+    return result.scalars().first()
 
 async def orm_get_accounts_by_game(session: AsyncSession, game: str):
     query = select(Accounts).where(Accounts.gamesonaacaunt == game )

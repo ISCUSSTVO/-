@@ -1,12 +1,16 @@
-from aiogram import types
+import asyncio
+import email
+import imaplib
+import re
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
-from db.orm_query import orm_get_accounts_by_game, orm_get_category, orm_get_banner, orm_check_catalog
+from db.orm_query import orm_check_catalog1, orm_get_accounts_by_game, orm_get_category, orm_get_banner, orm_check_catalog
 from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns, inkbcreate
 
 
 
-
+IMAP_SERVER = "imap.mail.ru"
+SMTP_SERVER = "smtp.mail.ru"
 
 async def main(session, menu_name, level):
     banner = await orm_get_banner(session, menu_name)
@@ -117,27 +121,166 @@ async def vidachalogs(session: AsyncSession, game:str):
         })
 
         return image, kbds
+    
+async def take_code(session: AsyncSession, level):
+
+    banner = await orm_get_banner(session, "steam_guard")
+    if banner:
+        image = InputMediaPhoto(
+            media=banner.image,
+            caption='сын шлюхи введи логин и пароль'
+        )
+    else:
+        image = None
+    
+    kbds = back_kbds(level=level)
+
+    return image, kbds 
 
 
+async def chek_mail(session: AsyncSession, game: str):
+    qwe = None
+    extracted_phrase = None
+    result = await orm_get_accounts_by_game(session, game)
+    for account in result:
+        user_data = (account.accmail, account.imap)
+        try:
+            loop = asyncio.get_event_loop()
+            # Создание цикла событий asyncio
 
+            if user_data is None:
+               # await callback.message.answer("Не удалось получить данные из почтового ящика")
+                return
+            # Проверка наличия данных пользователя из почтового ящика
 
+            mail_connection = await loop.run_in_executor(
+                None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
+            )
+            # Установка защищенного соединения с почтовым сервером
 
+            mail_connection.login(user_data[0], user_data[1])
+            mail_connection.select("INBOX")
+            # Вход в почтовый ящик и выбор папки "INBOX"
 
+            status, data = mail_connection.search(None, "FROM", '"Steam"')
+            # Поиск писем от Steam
+
+            latest_email_id = data[0].split()[-1]
+            status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
+            # Извлечение последнего письма от Steam
+
+            raw_email = data[0][1]
+            email_message = email.message_from_bytes(raw_email)
+            # Извлечение содержимого письма
+
+            decoded_payload = None
+            if email_message.is_multipart():
+                for part in email_message.walk():
+                    if part.get_content_type() == "text/plain":
+                        decoded_payload = part.get_payload(decode=True).decode("utf-8")
+                        break
+            else:
+                decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
+            # Декодирование содержимого письма
+
+            if decoded_payload:
+                match = re.search(r'Россия(.*?)Если это были не вы', decoded_payload, re.DOTALL)
+                extracted_phrase = match.group(1).strip()
+                #await callback.message.answer(f"{extracted_phrase}")
+            #else:
+               # await callback.message.answer("Не удалось декодировать содержимое письма")
+            # Извлечение кода доступа из письма и отправка его пользователю
+
+        except Exception as e:
+            qwe = (f'Произошла ошибка при чтении почты обратитесь к администратору:\n{e}')
+        finally:
+            if "mail_connection" in locals():
+                mail_connection.logout()
+    return qwe, extracted_phrase
+
+async def chek_code_guard(session: AsyncSession, user_data: str):
+    qwe = None
+    extracted_phrase = None
+    banner = await orm_get_banner(session, "steam_guard")
+    result = await orm_check_catalog1(session, user_data)
+    if user_data[0] == result:
+        try:
+            loop = asyncio.get_event_loop()
+            # Создание цикла событий asyncio
+
+            if user_data is None:
+               # await callback.message.answer("Не удалось получить данные из почтового ящика")
+                return
+            # Проверка наличия данных пользователя из почтового ящика
+
+            mail_connection = await loop.run_in_executor(
+                None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
+            )
+            # Установка защищенного соединения с почтовым сервером
+
+            mail_connection.login(user_data[0], user_data[1])
+            mail_connection.select("INBOX")
+            # Вход в почтовый ящик и выбор папки "INBOX"
+
+            status, data = mail_connection.search(None, "FROM", '"Steam"')
+            # Поиск писем от Steam
+
+            latest_email_id = data[0].split()[-1]
+            status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
+            # Извлечение последнего письма от Steam
+
+            raw_email = data[0][1]
+            email_message = email.message_from_bytes(raw_email)
+            # Извлечение содержимого письма
+
+            decoded_payload = None
+            if email_message.is_multipart():
+                for part in email_message.walk():
+                    if part.get_content_type() == "text/plain":
+                        decoded_payload = part.get_payload(decode=True).decode("utf-8")
+                        break
+            else:
+                decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
+            # Декодирование содержимого письма
+
+            if decoded_payload:
+                match = re.search(r'Россия(.*?)Если это были не вы', decoded_payload, re.DOTALL)
+                extracted_phrase = match.group(1).strip()
+                #await callback.message.answer(f"{extracted_phrase}")
+            #else:
+               # await callback.message.answer("Не удалось декодировать содержимое письма")
+            # Извлечение кода доступа из письма и отправка его пользователю
+
+        except Exception as e:
+            qwe = (f'Произошла ошибка при чтении почты обратитесь к администратору:\n{e}')
+        finally:
+            if "mail_connection" in locals():
+                mail_connection.logout()
+
+        if banner:
+            image = InputMediaPhoto(
+                media=banner.image,
+                caption=extracted_phrase
+            )
+    return qwe, image
 
 async def get_menu_content(
     session: AsyncSession,
     level: int,
     menu_name: str,
     game_cat: str = None,
+    state: str = None
 ):
     if level == 0:
         return await main(session=session, level=level, menu_name=menu_name)
 
     elif level == 1:
-        return await categ(session)
+       return await take_code(session, level)
 
     elif level == 2:
+        return await categ(session)
+
+    elif level == 3:
         return await game_catalog(session, game_cat, level)
     
-   #elif level == 3:
-   #    return await carts(session)
+

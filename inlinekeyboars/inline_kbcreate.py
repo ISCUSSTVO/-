@@ -33,10 +33,15 @@ def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
         "Аккаунты": "catalog",
         "О нас ": "about",
         "Оплата": "payment",
+        "Steam Guard":  "steam_guard",
         }
     for text, menu_name  in btns.items():
         if menu_name == 'catalog':
-            keyboard.add(InlineKeyboardButton(text=text, callback_data=Menucallback(level=1, menu_name=menu_name).pack()))   
+            keyboard.add(InlineKeyboardButton(text=text, 
+                                              callback_data=Menucallback(level=2, menu_name=menu_name).pack()))   
+        elif menu_name == 'steam_guard':
+            keyboard.add(InlineKeyboardButton(text=text, 
+                                              callback_data=Menucallback(level=1, menu_name=menu_name).pack()))  
         else:
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data =Menucallback(level=level, menu_name=menu_name).pack()))   
