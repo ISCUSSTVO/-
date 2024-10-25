@@ -121,22 +121,6 @@ async def vidachalogs(session: AsyncSession, game:str):
         })
 
         return image, kbds
-    
-async def take_code(session: AsyncSession, level):
-
-    banner = await orm_get_banner(session, "steam_guard")
-    if banner:
-        image = InputMediaPhoto(
-            media=banner.image,
-            caption='сын шлюхи введи логин и пароль'
-        )
-    else:
-        image = None
-    
-    kbds = back_kbds(level=level)
-
-    return image, kbds 
-
 
 async def chek_mail(session: AsyncSession, game: str):
     qwe = None
@@ -198,71 +182,60 @@ async def chek_mail(session: AsyncSession, game: str):
                 mail_connection.logout()
     return qwe, extracted_phrase
 
-async def chek_code_guard(session: AsyncSession, user_data: str):
-    qwe = None
+async def chek_code_guard(session: AsyncSession, mail: str):
+    qwe = "Успешно"  # Инициализируем значение по умолчанию
     extracted_phrase = None
-    banner = await orm_get_banner(session, "steam_guard")
-    result = await orm_check_catalog1(session, user_data)
-    if user_data[0] == result:
-        try:
-            loop = asyncio.get_event_loop()
-            # Создание цикла событий asyncio
 
-            if user_data is None:
-               # await callback.message.answer("Не удалось получить данные из почтового ящика")
-                return
-            # Проверка наличия данных пользователя из почтового ящика
+    result = await orm_check_catalog1(session, mail)
+    if result is None:
+        return "Не удалось найти данные пользователя.", None
 
-            mail_connection = await loop.run_in_executor(
-                None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
-            )
-            # Установка защищенного соединения с почтовым сервером
+    user_data = (result.accmail, result.imap)
 
-            mail_connection.login(user_data[0], user_data[1])
-            mail_connection.select("INBOX")
-            # Вход в почтовый ящик и выбор папки "INBOX"
+    try:
+        loop = asyncio.get_event_loop()
 
-            status, data = mail_connection.search(None, "FROM", '"Steam"')
-            # Поиск писем от Steam
+        mail_connection = await loop.run_in_executor(
+            None, lambda: imaplib.IMAP4_SSL(IMAP_SERVER)
+        )
 
-            latest_email_id = data[0].split()[-1]
-            status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
-            # Извлечение последнего письма от Steam
+        mail_connection.login(user_data[0], user_data[1])
+        mail_connection.select("INBOX")
 
-            raw_email = data[0][1]
-            email_message = email.message_from_bytes(raw_email)
-            # Извлечение содержимого письма
+        status, data = mail_connection.search(None, "FROM", '"Steam"')
+        if not data[0]:  # Проверка на наличие писем
+            return "Нет писем от Steam.", None
 
-            decoded_payload = None
-            if email_message.is_multipart():
-                for part in email_message.walk():
-                    if part.get_content_type() == "text/plain":
-                        decoded_payload = part.get_payload(decode=True).decode("utf-8")
-                        break
-            else:
-                decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
-            # Декодирование содержимого письма
+        latest_email_id = data[0].split()[-1]
+        status, data = mail_connection.fetch(latest_email_id, "(RFC822)")
+        raw_email = data[0][1]
+        email_message = email.message_from_bytes(raw_email)
 
-            if decoded_payload:
-                match = re.search(r'Россия(.*?)Если это были не вы', decoded_payload, re.DOTALL)
+        decoded_payload = None
+        if email_message.is_multipart():
+            for part in email_message.walk():
+                if part.get_content_type() == "text/plain":
+                    decoded_payload = part.get_payload(decode=True).decode("utf-8")
+                    break
+        else:
+            decoded_payload = email_message.get_payload(decode=True).decode("utf-8")
+
+        if decoded_payload:
+            match = re.search(r'Россия(.*?)Если это были не вы', decoded_payload, re.DOTALL)
+            if match:
                 extracted_phrase = match.group(1).strip()
-                #await callback.message.answer(f"{extracted_phrase}")
-            #else:
-               # await callback.message.answer("Не удалось декодировать содержимое письма")
-            # Извлечение кода доступа из письма и отправка его пользователю
+            else:
+                qwe = "Не удалось извлечь код доступа из письма."
+        else:
+            qwe = "Не удалось декодировать содержимое письма."
 
-        except Exception as e:
-            qwe = (f'Произошла ошибка при чтении почты обратитесь к администратору:\n{e}')
-        finally:
-            if "mail_connection" in locals():
-                mail_connection.logout()
+    except Exception as e:
+        qwe = f'Произошла ошибка при чтении почты. Обратитесь к администратору:n{e}'
+    finally:
+        if "mail_connection" in locals():
+            mail_connection.logout()
 
-        if banner:
-            image = InputMediaPhoto(
-                media=banner.image,
-                caption=extracted_phrase
-            )
-    return qwe, image
+    return qwe, extracted_phrase
 
 async def get_menu_content(
     session: AsyncSession,
@@ -273,9 +246,6 @@ async def get_menu_content(
 ):
     if level == 0:
         return await main(session=session, level=level, menu_name=menu_name)
-
-    elif level == 1:
-       return await take_code(session, level)
 
     elif level == 2:
         return await categ(session)

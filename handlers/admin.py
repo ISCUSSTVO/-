@@ -48,7 +48,7 @@ async def admin_commands_cb(callback: types.CallbackQuery):
             'Добавить изменить банер':  'banner'
         })
     )
-
+    
     await callback.message.delete()
 
 ####################################АДМ МЕНЮ МСГ####################################

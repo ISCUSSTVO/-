@@ -1,6 +1,6 @@
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardButton
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton, KeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 class Menucallback(CallbackData, prefix ="menu"):
     level: int
@@ -31,17 +31,12 @@ def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
     keyboard = InlineKeyboardBuilder()
     btns = {
         "Аккаунты": "catalog",
-        "О нас ": "about",
-        "Оплата": "payment",
-        "Steam Guard":  "steam_guard",
+        "Варианты оплата": "payment",
         }
     for text, menu_name  in btns.items():
         if menu_name == 'catalog':
             keyboard.add(InlineKeyboardButton(text=text, 
                                               callback_data=Menucallback(level=2, menu_name=menu_name).pack()))   
-        elif menu_name == 'steam_guard':
-            keyboard.add(InlineKeyboardButton(text=text, 
-                                              callback_data=Menucallback(level=1, menu_name=menu_name).pack()))  
         else:
             keyboard.add(InlineKeyboardButton(text=text,
                                               callback_data =Menucallback(level=level, menu_name=menu_name).pack()))   
@@ -63,7 +58,30 @@ def back_kbds(
     keyboard.adjust(*sizes)
     return keyboard.as_markup()
 
+############################################################Клавиатура обичная############################################################
+def get_keyboard(
+    *,
+    btns: str,
+    placeholder: str = None,
+    request_contact: int = None,
+    request_location: int = None,
+    sizes: tuple[int] = (2,),
+):
 
+    keyboard = ReplyKeyboardBuilder()
+
+    for index, text in enumerate(btns, start=0):
+        
+        if request_contact and request_contact == index:
+            keyboard.add(KeyboardButton(text=text, request_contact=True))
+
+        elif request_location and request_location == index:
+            keyboard.add(KeyboardButton(text=text, request_location=True))
+        else:
+            keyboard.add(KeyboardButton(text=text))
+
+    return keyboard.adjust(*sizes).as_markup(
+            resize_keyboard=True, input_field_placeholder=placeholder)
 ############################################################Клавиатура покупки############################################################
 def buying_kbds(
     *,

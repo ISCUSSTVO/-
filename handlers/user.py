@@ -1,12 +1,13 @@
 from aiogram import types, Router, F
 from aiogram.filters import CommandStart
 #from aiogram.types import InputMediaPhoto
+from db.engine import AsyncSessionLocal
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.orm_query import orm_check_catalog1, orm_get_accounts_by_game, orm_get_banner
-from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate
+from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate, get_keyboard
 from aiogram.fsm.state import State, StatesGroup
-from handlers.menu_proccesing import chek_mail, game_catalog, game_searching, get_menu_content, take_code, vidachalogs
+from handlers.menu_proccesing import chek_code_guard, chek_mail, game_catalog, game_searching, get_menu_content, take_code, vidachalogs
 
 user_router = Router()
 
@@ -14,15 +15,23 @@ user_router = Router()
 account_list = [] 
 
 
-
-
-
 @user_router.message(F.text.lower().contains('start'))
-@user_router.message(F.text.lower().contains('старт'))
-@user_router.message(CommandStart())
-async def start (message: types.Message, session: AsyncSession):
+async def start(message: types.Message, session: AsyncSession):
+    banner = await orm_get_banner(session, "about")
+    msg = await message.answer_photo(photo=banner.image, caption = banner.description, reply_markup=get_keyboard(btns={
+        'Главное меню',
+        'Я уже купил аккаунт'
+    }))  
+
+
+
+
+@user_router.message(F.text.lower().contains('menu'))
+@user_router.message(F.text.lower().contains('меню'))
+async def menu (message: types.Message, session: AsyncSession):
     media, reply_markup = await get_menu_content(session, level=0, menu_name="main")
     await message.answer_photo(media.media, caption=media.caption, reply_markup=reply_markup)
+
 
 @user_router.callback_query(Menucallback.filter())
 async def user_manu(callback: types.CallbackQuery, callback_data: Menucallback, session: AsyncSession):
@@ -75,38 +84,62 @@ async def chek_mail1(callback: types.CallbackQuery, session: AsyncSession):
     else:
         await callback.message.answer(qwe)
         
+
+
+
 ############################Получение кода купленного аккаунта############################
 class GetCode(StatesGroup):
-    user_data = State()
+    mail = State()
+    passw = State()
 
-@user_router.callback_query(F.data == Menucallback(level=1, menu_name='steam_guard').pack())
-async def handle_steam_guard(callback_query: types.CallbackQuery, state: FSMContext, session: AsyncSession):
+@user_router.message(F.text == ('Я уже купил аккаунт'))
+async def handle_steam_guard(message: types.Message, state: FSMContext, session: AsyncSession):
+    banner  = await orm_get_banner(session, "steam_guard")
 
-    image = await take_code(session, level=1)
-    await state.set_state(GetCode.user_data)
-    await callback_query.message.edit_media(media=image)
+   #image , caption= await take_code(session)
+    await state.set_state(GetCode.mail)
+    await message.answer_photo(photo=banner.image,caption= banner.description)
+    await message.delete()
    
 
 
-@user_router.message(GetCode.user_data)
-async def chek_code_guard(session: AsyncSession, message:types.Message, state: FSMContext):
-    await take_code(session,level=1)
-    qwe = await state.update_data(user_data=message.text)
-    result = await orm_check_catalog1(session, qwe)
-    if qwe == result:
-        await message.answer('динахуй')
+@user_router.message(GetCode.mail)
+async def chek_code(message:types.Message, state: FSMContext):
+    mail1 = message.text
+
+    async with AsyncSessionLocal as session:  # Используйте
+        res = await orm_check_catalog1(session, mail1)
+    if res:
+        await message.answer('Введи пароль')
+        await state.update_data(email=mail1)
+        await state.update_data(pas=res.imap)
+        await state.set_state(GetCode.passw) 
+    else: 
+        await message.answer('Нет аккаунта с такой почтой')
+
+@user_router.message(GetCode.passw)
+async def chek_code1(message: types.Message, state: FSMContext, session: AsyncSession):
+    password = message.text
+    data = await state.get_data()
+    mail = data.get('email') 
+    passs = data.get('pas') 
+    print(f"Введённый пароль: {password}, Сохранённый пароль: {passs}")
+    
+    if password == passs:
+        qwe, extracted_phrase = await chek_code_guard(session, mail)
+        
+        if extracted_phrase is not None:
+            await message.answer(extracted_phrase)
+        else:
+            await message.answer(qwe)
+            
+        await state.clear()
     else:
-        await message.answer("ебать ты крутой")
+        await message.answer('Неверный пароль.')
+        await state.clear()
 
 
-    #qwe,image = await chek_mail(session, user_data)
-    #if image:
-    #    await message.edit_media(media=image)
-    #else:
-    #    await message.edit_text(qwe)
-#
-
-
+################################################################
 
 
 

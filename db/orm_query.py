@@ -38,10 +38,12 @@ async def orm_check_catalog(session: AsyncSession):
     query = select(Accounts)
     result = await session.execute(query)
     return result.scalars().all()
-async def orm_check_catalog1(session: AsyncSession, user_data):
-    query = select(Accounts).where(Accounts.accmail == user_data[0])
+
+async def orm_check_catalog1(session: AsyncSession, mail):
+    query = select(Accounts).where(Accounts.accmail == mail)
     result = await session.execute(query)
-    return result.scalars().all()
+    return result.scalars().first()
+
 ############### Работа с админским хендлером###############
 async def orm_use_admin(session: AsyncSession):
     query = select(Admins)
