@@ -26,6 +26,19 @@ def inkbcreate(
 
     return keyboard.adjust(*sizes).as_markup()
 
+
+def inkburlcreate(
+    *,
+    btns: dict[str, str],
+    sizes: tuple[int] = (2,)):
+
+    keyboard = InlineKeyboardBuilder()
+
+    for text, url in btns.items():
+        
+        keyboard.add(InlineKeyboardButton(text=text, url=url))
+
+    return keyboard.adjust(*sizes).as_markup()
 ############################################################Главная клавиатура############################################################
 def get_user_main_btns(*, level:int, sizes: tuple[int] = (2,)):
     keyboard = InlineKeyboardBuilder()

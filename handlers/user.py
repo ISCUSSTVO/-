@@ -1,13 +1,13 @@
 from aiogram import types, Router, F
 from aiogram.filters import CommandStart
-#from aiogram.types import InputMediaPhoto
+from aiogram.types import LabeledPrice
 from db.engine import AsyncSessionLocal
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.orm_query import orm_check_catalog1, orm_get_accounts_by_game, orm_get_banner
 from inlinekeyboars.inline_kbcreate import Menucallback, inkbcreate, get_keyboard
 from aiogram.fsm.state import State, StatesGroup
-from handlers.menu_proccesing import chek_code_guard, chek_mail, game_catalog, game_searching, get_menu_content, take_code, vidachalogs
+from handlers.menu_proccesing import chek_code_guard, chek_mail, game_catalog, game_searching, get_menu_content, vidachalogs
 
 user_router = Router()
 
@@ -64,6 +64,33 @@ async def buy_acc(callback:types.CallbackQuery, session:AsyncSession):
     game = callback.data.split('_')[-1]
     image, kbds = await game_searching(session, game)
     await callback.message.edit_media(image, reply_markup=kbds)
+    
+
+@user_router.callback_query(F.data.startswith('buy_'))
+async def send_invoice(callback_query:types.CallbackQuery, session: AsyncSession):
+    game = callback_query.data.split('_')[-1]    
+    account = await orm_get_accounts_by_game(session, game)
+    for result in account:
+        prices = [LabeledPrice(label=result.description, amount=result.price * 100)]  # Указываем цену в копейках
+        banner = await orm_get_banner(session, 'catalog')
+        await callback_query.message.answer_invoice(
+            title='Оплата',
+            description=result.gamesonaacaunt,
+            payload='payload',
+            provider_token='381764678:TEST:93111',  # Замените на ваш токен провайдера
+            currency='RUB',
+            prices=prices,
+            #start_parameter='test',
+            photo_url=banner.image if banner else None,
+            photo_size=512,
+            photo_width=512,
+            photo_height=512,
+            #need_name=True,
+            need_phone_number=True,
+            #need_email=True,
+            is_flexible=False
+        )
+        await callback_query.answer()
 
 
 @user_router.callback_query(F.data.startswith('oplatil_'))
@@ -158,7 +185,7 @@ async def game_search(message: types.Message, session: AsyncSession):
         )
 
         kbds = inkbcreate(btns={
-                "Купить 💵":    f"buyacc_{account.gamesonaacaunt}"
+                "Выбрать ✅":    f"buyacc_{account.gamesonaacaunt}"
         })
         await message.answer_photo(account.image,caption=account_info, reply_markup=kbds)
         await message.delete()

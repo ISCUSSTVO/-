@@ -5,13 +5,13 @@ import re
 from aiogram.types import InputMediaPhoto
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.orm_query import orm_check_catalog1, orm_get_accounts_by_game, orm_get_category, orm_get_banner, orm_check_catalog
-from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns, inkbcreate
+from inlinekeyboars.inline_kbcreate import back_kbds, get_user_main_btns, inkbcreate, inkburlcreate
 
 
 
 IMAP_SERVER = "imap.mail.ru"
 SMTP_SERVER = "smtp.mail.ru"
-
+shop_id = 506751
 async def main(session, menu_name, level):
     banner = await orm_get_banner(session, menu_name)
     image = InputMediaPhoto(media=banner.image, caption=banner.description)
@@ -84,25 +84,32 @@ async def game_catalog(session: AsyncSession, game_cat: str, level):
 
     return image, kbds
 
+
 async def game_searching(session: AsyncSession, game: str):
     account_qwe = await orm_get_accounts_by_game(session, game)
     banner = await orm_get_banner(session, "catalog")
     image = None
+   
     for account in account_qwe:  # Проходим по всем найденным услугам
         account_info = (
-            "тут будет логика оплаты"
+            f'Аккаунт: {account.description}\n Цена: {account.price}'
         )
+
         if banner:
             image = InputMediaPhoto(
                 media=banner.image,
                 caption=account_info
             )
-        kbds = inkbcreate(btns={
-            "Я оплатил":    f'oplatil_{account.gamesonaacaunt}'
-        })
+        
 
-        return image, kbds
-    
+
+        kbds = inkbcreate(btns={
+            'Оплатить': f'buy_{account.gamesonaacaunt}'
+        })
+    return image, kbds
+
+
+       
 async def vidachalogs(session: AsyncSession, game:str):
     account_qwe = await orm_get_accounts_by_game(session, game)
     banner = await orm_get_banner(session, "catalog")

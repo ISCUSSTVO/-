@@ -3,3 +3,4 @@ sqlalchemy==2.0.25
 python-dotenv
 asyncpg
 aiosqlite
+requests
