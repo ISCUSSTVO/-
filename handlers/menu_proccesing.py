@@ -92,7 +92,7 @@ async def game_searching(session: AsyncSession, game: str):
    
     for account in account_qwe:  # Проходим по всем найденным услугам
         account_info = (
-            f'Аккаунт: {account.description}\n Цена: {account.price}'
+            f'Аккаунт: {account.description}\n Цена: {account.price} rub'
         )
 
         if banner:
@@ -104,7 +104,7 @@ async def game_searching(session: AsyncSession, game: str):
 
 
         kbds = inkbcreate(btns={
-            'Оплатить': f'buy_{account.gamesonaacaunt}'
+            'Оплатить 💸': f'buy_{account.gamesonaacaunt}'
         })
     return image, kbds
 

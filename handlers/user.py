@@ -23,7 +23,8 @@ async def start(message: types.Message, session: AsyncSession):
         'Я уже купил аккаунт'
     }))  
 
-
+    message.delete_reply_markup()
+    message.delete()
 
 
 @user_router.message(F.text.lower().contains('menu'))
@@ -67,12 +68,22 @@ async def buy_acc(callback:types.CallbackQuery, session:AsyncSession):
     
 
 @user_router.callback_query(F.data.startswith('buy_'))
-async def send_invoice(callback_query:types.CallbackQuery, session: AsyncSession):
+async def send_invoice(callback_query: types.CallbackQuery, session: AsyncSession):
     game = callback_query.data.split('_')[-1]    
     account = await orm_get_accounts_by_game(session, game)
-    for result in account:
-        prices = [LabeledPrice(label=result.description, amount=result.price * 100)]  # Указываем цену в копейках
-        banner = await orm_get_banner(session, 'catalog')
+
+    if not account:
+        await callback_query.answer("Аккаунт не найден.", show_alert=True)
+        return
+
+    # Предположим, что вы хотите отправить только один инвойс для первого аккаунта
+    result = account[0]
+    price_in_cents = result.price * 100
+    print (price_in_cents)  # Переводим цену в копейки
+    prices = [LabeledPrice(label=result.description, amount=price_in_cents)]  # Указываем цену в копейках
+    banner = await orm_get_banner(session, 'catalog')
+
+    try:
         await callback_query.message.answer_invoice(
             title='Оплата',
             description=result.gamesonaacaunt,
@@ -80,17 +91,15 @@ async def send_invoice(callback_query:types.CallbackQuery, session: AsyncSession
             provider_token='381764678:TEST:93111',  # Замените на ваш токен провайдера
             currency='RUB',
             prices=prices,
-            #start_parameter='test',
             photo_url=banner.image if banner else None,
             photo_size=512,
             photo_width=512,
             photo_height=512,
-            #need_name=True,
-            need_phone_number=True,
-            #need_email=True,
             is_flexible=False
         )
-        await callback_query.answer()
+        await callback_query.answer("Инвойс отправлен.")
+    except Exception as e:
+        await callback_query.answer(f"Ошибка при отправке инвойса: {str(e)}", show_alert=True)
 
 
 @user_router.callback_query(F.data.startswith('oplatil_'))
